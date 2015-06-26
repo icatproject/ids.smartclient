@@ -1,22 +1,18 @@
 package org.icatproject.ids.smartclient;
 
+import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.rules.ExpectedException.none;
 
 import java.io.IOException;
-import java.util.List;
 
-import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import static java.util.Arrays.*;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-
-import static org.junit.rules.ExpectedException.none;
 
 public class TestCli {
 
@@ -25,9 +21,6 @@ public class TestCli {
 
 	@Test
 	public void supportsShortOptions() throws IOException {
-//		Cli.main("--i", "12", "-i14", "-i23", "-s15", "--investigation=45");
-		
-//		Cli.main("--i", "12", "-i14", "-i23", "-s15", "--investigation=45");
 		OptionParser parser = new OptionParser();
 
 		OptionSpec<Long> investigations = parser.acceptsAll(asList("investigation", "i")).withRequiredArg()

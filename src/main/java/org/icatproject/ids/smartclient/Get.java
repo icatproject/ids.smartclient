@@ -44,17 +44,12 @@ public class Get {
 			parser.printHelpOn(System.out);
 		} else {
 
-			System.out.println(options.valuesOf(investigations));
-			System.out.println(options.valuesOf(datasets));
-			System.out.println(options.valuesOf(datafiles));
-
 			if (options.nonOptionArguments().size() != 1) {
-				Cli.abort("get expects only one argument");
+				Cli.abort("get expects one argument with the server url");
 
 			} else {
 				String idsUrl = (String) options.nonOptionArguments().get(0);
 				URI uri = new URIBuilder("http://localhost:8888").setPath("/getData").build();
-				System.out.println("Uri " + uri);
 
 				List<NameValuePair> formparams = new ArrayList<>();
 				formparams.add(new BasicNameValuePair("idsUrl", idsUrl));
@@ -74,18 +69,10 @@ public class Get {
 					httpPost.setEntity(entity);
 					try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
 						Cli.expectNothing(response);
-					} // catch (InsufficientStorageException |
-						// DataNotOnlineException e) {
-					// throw new InternalException(e.getClass() + " " +
-					// e.getMessage());
-					// }
-
+					}
 				}
-
 			}
-
 		}
-
 	}
 
 	private String listToString(List<Long> ids) {

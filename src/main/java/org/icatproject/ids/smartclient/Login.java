@@ -36,18 +36,17 @@ public class Login {
 			parser.printHelpOn(System.out);
 		} else {
 
-			if (options.nonOptionArguments().size() != 2) {
-				System.err.println("Whoops");
+			if (options.nonOptionArguments().size() % 2 != 0) {
+				System.err.println("Login requires two arguments");
 
 			} else {
 				String idsUrl = (String) options.nonOptionArguments().get(0);
 				String sessionId = (String) options.nonOptionArguments().get(1);
 				URI uri = new URIBuilder("http://localhost:8888").setPath("/login").build();
-				System.out.println("Uri " + uri);
 
 				List<NameValuePair> formparams = new ArrayList<>();
-				formparams.add(new BasicNameValuePair("sessionId", sessionId));
 				formparams.add(new BasicNameValuePair("idsUrl", idsUrl));
+				formparams.add(new BasicNameValuePair("sessionId", sessionId));
 
 				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 					HttpEntity entity = new UrlEncodedFormEntity(formparams);
@@ -55,12 +54,7 @@ public class Login {
 					httpPost.setEntity(entity);
 					try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
 						Cli.expectNothing(response);
-					} // catch (InsufficientStorageException |
-						// DataNotOnlineException e) {
-					// throw new InternalException(e.getClass() + " " +
-					// e.getMessage());
-					// }
-
+					}
 				}
 
 			}

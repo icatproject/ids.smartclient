@@ -1,0 +1,28 @@
+# Version of file format
+1.0
+
+Facility ( name:0, daysUntilRelease:1, createId:2, createTime:3)
+"Test smartclient", 90, "Zorro", 1920-05-16T16:58:26.12Z
+
+InvestigationType (facility(name:0), name:1)
+"Test smartclient", "atype"
+"Test smartclient", "btype"
+
+Investigation(facility(name:0), name:1, visitId:2, type(facility(name:0), name:3),title:4,startDate:5,endDate:6)
+"Test smartclient", "expt1", "zero", "atype", "a title at the beginning", 2010-01-01T00:00:00Z, 2010-12-31T23:59:59Z
+"Test smartclient", "expt1", "one", "atype", "a title in the middle",2011-01-01T00:00:00Z, 2011-12-31T23:59:59Z
+"Test smartclient", "expt1", "two", "atype", "a title at the end",2012-01-01T00:00:00Z, 2012-12-31T23:59:59Z
+
+DatasetType(facility(name:0), name:1)
+"Test smartclient", "calibration"
+
+Dataset (investigation(facility(name:0), name:1, visitId:2) , name:3, type(facility(name:0), name:4), complete:5, startDate:6, endDate:7, description:8)
+"Test smartclient", "expt1", "one", "ds1", "calibration", true,  2014-05-16T16:58:26.12+12:30, 2014-05-16T16:58:26.12+12:30,  "alpha"
+"Test smartclient", "expt1", "one", "ds2", "calibration", null,  2014-05-16T06:05:26.12Z, 2014-05-16T06:07:26.12+12:30, "beta"
+"Test smartclient", "expt1", "one", "ds3", "calibration", False, 2014-05-16T06:09:26.12, 2014-05-16T06:15:26.12,  "gamma"
+"Test smartclient", "expt1", "two", "ds3", "calibration", False, 2014-05-16T06:20:26.12, 2014-05-16T06:21:26.12,  "delta"
+"Test smartclient", "expt1", "two", "ds4", "calibration", False, 2014-05-16T06:31:26.12, 2014-05-16T06:32:26.12,  "epsilon"
+
+DatafileFormat (facility(name:0), name:1, version:2)
+"Test smartclient","one", "1.3.0"
+"Test smartclient","two", "1.4.2"
