@@ -69,6 +69,37 @@ public class Get {
 					httpPost.setEntity(entity);
 					try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
 						Cli.expectNothing(response);
+						// Cli.checkStatus(response);
+						// entity = response.getEntity();
+						//
+						// if (entity == null) {
+						// Cli.abort("http entity expected in response");
+						// } else {
+						// String jsonString = EntityUtils.toString(entity);
+						//
+						// try (JsonReader jsonReader = Json.createReader(new
+						// StringReader(jsonString))) {
+						// JsonObject json = jsonReader.readObject();
+						// long size =
+						// json.getJsonNumber("size").longValueExact();
+						// if (size < 1024) {
+						// System.out.println("Will get up to " + size +
+						// " bytes");
+						// } else if (size < 1024 * 1024) {
+						// System.out.println("Will get up to " + size / 1024 +
+						// " kbytes");
+						// } else if (size < 1024 * 1024 * 1024) {
+						// System.out.println("Will get up to " + size / (1024 *
+						// 1024) + " mbytes");
+						// } else {
+						// System.out.println("Will get up to " + size / (1024 *
+						// 1024 * 1024) + " gbytes");
+						// }
+						// } catch (JsonException e) {
+						// Cli.abort("Unexpected json returned " + jsonString);
+						// }
+						// }
+
 					}
 				}
 			}

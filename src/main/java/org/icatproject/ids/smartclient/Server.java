@@ -13,20 +13,26 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -38,8 +44,10 @@ import javax.json.JsonValue;
 import javax.json.stream.JsonGenerator;
 
 import org.icatproject.icat.client.ICAT;
+import org.icatproject.icat.client.IcatException;
 import org.icatproject.icat.client.Session;
 import org.icatproject.ids.client.BadRequestException;
+import org.icatproject.ids.client.DataNotOnlineException;
 import org.icatproject.ids.client.DataSelection;
 import org.icatproject.ids.client.IdsClient;
 import org.icatproject.ids.client.IdsClient.Flag;
@@ -58,12 +66,43 @@ import com.sun.net.httpserver.HttpServer;
 @SuppressWarnings("restriction")
 // Keeps eclipse happy
 public class Server {
+	public class RestoreTask implements Callable<Void> {
+
+		private String sessionId;
+		private DataSelection data;
+		private IdsClient idsClient;
+
+		public RestoreTask(IdsClient idsClient, String sessionId, DataSelection data) {
+			this.idsClient = idsClient;
+			this.sessionId = sessionId;
+			this.data = data;
+		}
+
+		@Override
+		public Void call() {
+			try {
+				idsClient.restore(sessionId, data);
+				logger.debug("Restore request was succesful");
+			} catch (NotImplementedException | BadRequestException | InsufficientPrivilegesException
+					| InternalException | NotFoundException e) {
+				logger.warn("Restore request failed " + e.getClass().getSimpleName() + " " + e.getMessage());
+			}
+			return null;
+		}
+
+	}
+
 	private static Path dot;
 	private static Path top;
 	private final static Logger logger = LoggerFactory.getLogger(Server.class);
 
 	public static void main(String[] args) throws Exception {
+		new Server();
+	}
 
+	private ExecutorService singleThreadPool;
+
+	public Server() throws IOException {
 		logger.info("Personal server starting");
 
 		int port = 8888;
@@ -138,15 +177,10 @@ public class Server {
 							return;
 						}
 
-						try {
-							idsClient.restore(sessionId, data);
-							httpExchange.sendResponseHeaders(200, 0);
-							httpExchange.getResponseBody().close();
-							System.out.println("Success!");
-						} catch (NotImplementedException | BadRequestException | InsufficientPrivilegesException
-								| InternalException | NotFoundException e) {
-							report(httpExchange, 400, e.getClass().getSimpleName(), e.getMessage());
-						}
+						singleThreadPool.submit(new RestoreTask(idsClient, sessionId, data));
+
+						httpExchange.sendResponseHeaders(200, 0);
+						httpExchange.close();
 
 					}
 
@@ -171,10 +205,27 @@ public class Server {
 							map.put(URLDecoder.decode(pair.substring(0, idx), "UTF-8"),
 									URLDecoder.decode(pair.substring(idx + 1), "UTF-8"));
 						}
+						String idsUrl = map.get("idsUrl");
+						String filename = getServerFileName(idsUrl);
+						String sessionId = map.get("sessionId");
 
-						String filename = getServerFile(map.get("idsUrl"));
+						IdsClient idsClient = new IdsClient(new URL(idsUrl));
+
+						String icatUrl;
+						try {
+							icatUrl = idsClient.getIcatUrl().toString();
+							ICAT icatClient = new ICAT(icatUrl);
+							Session session = icatClient.getSession(sessionId);
+							session.refresh();
+						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
+							report(httpExchange, 500, "Possible internal error", e.getClass() + " " + e.getMessage());
+						} catch (IcatException e) {
+							report(httpExchange, 403, "ICAT reports", e.getClass() + " " + e.getMessage());
+						}
+
 						try (PrintWriter os = new PrintWriter(dot.resolve("servers").resolve(filename).toFile())) {
-							os.println(map.get("sessionId"));
+							os.println(sessionId);
+							os.println(idsUrl);
 						}
 					}
 					httpExchange.sendResponseHeaders(200, 0);
@@ -182,6 +233,8 @@ public class Server {
 				}
 			}
 		});
+
+		singleThreadPool = Executors.newSingleThreadExecutor();
 
 		Path home = Paths.get(System.getProperty("user.home"));
 		dot = home.resolve(".smartclient");
@@ -191,92 +244,231 @@ public class Server {
 		Files.createDirectories(dot, attr);
 		Files.createDirectories(dot.resolve("servers"));
 		Files.createDirectories(dot.resolve("requests"));
+		Files.createDirectories(dot.resolve("dfids"));
 
 		top = home.resolve("smartclient");
 		httpServer.start();
 
-		processRequests();
+		ProcessRequests pr = new ProcessRequests();
+		new Thread(pr).start();
+
+		ProcessGetDatafiles pdf = new ProcessGetDatafiles();
+		new Thread(pdf).start();
+
+		RefreshTask rt = new RefreshTask();
+		new Thread(rt).start();
 
 		logger.info("Personal server started");
 	}
 
-	private static void processRequests() throws InterruptedException {
+	class RefreshTask implements Runnable {
 
-		while (true) {
-			File[] files = dot.resolve("requests").toFile().listFiles();
-			if (files.length == 0) {
-				Thread.sleep(1000);
-			} else {
-				for (File file : files) {
-					try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-						String[] cmd = br.readLine().split("\\s");
-						logger.debug("Process request: " + cmd[0] + " " + cmd[1] + " " + cmd[2] + " " + cmd[3]);
-						if (cmd[1].equals("GET")) {
-							if (cmd[2].equals("Investigation")) {
-								processGetInvestigation(cmd);
-							} else if (cmd[2].equals("Datafile")) {
-								processGetDatafile(cmd);
-							}
-						}
-					} catch (Exception e) {
-						logger.debug(e.getClass() + " " + e.getMessage());
-					}
+		@Override
+		public void run() {
+			while (true) {
+				for (File file : dot.resolve("servers").toFile().listFiles()) {
 					try {
-						Files.delete(file.toPath());
+						String sessionId;
+						String idsUrl;
+						try (BufferedReader br = new BufferedReader(new FileReader(file));) {
+							sessionId = br.readLine();
+							idsUrl = br.readLine();
+						}
+
+						IdsClient idsClient = new IdsClient(new URL(idsUrl));
+
+						String icatUrl = null;
+						try {
+							icatUrl = idsClient.getIcatUrl().toString();
+							ICAT icatClient = new ICAT(icatUrl);
+							Session session = icatClient.getSession(sessionId);
+							session.refresh();
+						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
+							logger.warn("RefreshTask possible internal error for " + file + " " + " for Icat "
+									+ icatUrl + e.getMessage());
+						} catch (IcatException e) {
+							logger.debug("ICAT reports " + e.getClass() + " " + e.getMessage());
+							Files.delete(file.toPath());
+						}
 					} catch (IOException e) {
-						logger.debug(e.getClass() + " " + e.getMessage());
+						logger.warn("RefreshTask possible internal error for " + file + " " + e.getClass() + " "
+								+ e.getMessage());
 					}
 				}
-
+				try {
+					Thread.sleep(300 * 1000); // Five minutes
+				} catch (InterruptedException e) {
+					return;
+				}
 			}
 		}
-
 	}
 
-	private static void processGetDatafile(String[] cmd) {
+	class ProcessRequests implements Runnable {
+		public void run() {
+			while (true) {
+				File[] files = dot.resolve("requests").toFile().listFiles();
+				if (files.length == 0) {
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {
+						return;
+					}
+				} else {
+					for (File file : files) {
+						try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+							String[] cmd = br.readLine().split("\\s");
+							logger.debug("Process request: " + cmd[0] + " " + cmd[1] + " " + cmd[2] + " " + cmd[3]);
+							if (cmd[1].equals("GET")) {
+								if (cmd[2].equals("Investigation")) {
+									processGetInvestigation(cmd);
+								} else if (cmd[2].equals("Dataset")) {
+									processGetDataset(cmd);
+								} else if (cmd[2].equals("Datafile")) {
+									processGetDatafile(cmd);
+								}
+							}
+							Files.delete(file.toPath());
+						} catch (Exception e) {
+							logger.warn(e.getClass() + " " + e.getMessage());
+						}
 
-		try {
-			IdsClient idsClient = new IdsClient(new URL(cmd[0]));
-			String sessionId = getSessionId(cmd[0]);
+					}
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+						return;
+					}
+				}
+			}
+
+		}
+	}
+
+	private static void processGetDatafile(String[] cmd) throws Exception {
+		Long.parseLong(cmd[3]);
+		File target = dot.resolve("dfids").resolve(cmd[3]).toFile();
+		try (PrintWriter os = new PrintWriter(target)) {
+			os.println(cmd[0]);
+		}
+	}
+
+	public class ProcessOneDf implements Callable<Void> {
+
+		private File file;
+
+		public ProcessOneDf(File file) {
+			this.file = file;
+		}
+
+		@Override
+		public Void call() throws Exception {
+			String idsUrl;
+			try (BufferedReader br = new BufferedReader(new FileReader(file));) {
+				idsUrl = br.readLine();
+			}
+
+			IdsClient idsClient = new IdsClient(new URL(idsUrl));
+			String sessionId = getSessionId(idsUrl);
 
 			String icatUrl = idsClient.getIcatUrl().toString();
 			ICAT icatClient = new ICAT(icatUrl);
 			Session session = icatClient.getSession(sessionId);
-			long dfId = Long.parseLong(cmd[3]);
+			long dfId = Long.parseLong(file.getName());
 			String jsonString = session.get("Datafile", dfId);
+
+			String location;
+			long fileSize;
 			try (JsonReader parser = Json.createReader(new ByteArrayInputStream(jsonString.getBytes()))) {
 				JsonObject datafile = (JsonObject) parser.readObject().get("Datafile");
-				String location = ((JsonString) datafile.get("location")).getString();
-				long fileSize = ((JsonNumber) datafile.get("fileSize")).longValueExact();
-				logger.debug("with: " + location + " " + fileSize);
-				if (location.startsWith("/")) {
-					location = location.substring(1);
-				}
-				Path target = top.resolve(location);
-				Files.createDirectories(target.getParent());
-				if (!Files.exists(top.resolve(location))) {
-					DataSelection data = new DataSelection().addDatafile(dfId);
-					Status status = idsClient.getStatus(sessionId, data);
-					if (status == Status.ONLINE) {
-						try (InputStream in = idsClient.getData(sessionId, data, Flag.NONE, 0)) {
-							Files.copy(in, target);
-						}
-					} else if (status == Status.ARCHIVED) {
-						idsClient.restore(sessionId, data);
-					}
+				location = ((JsonString) datafile.get("location")).getString();
+				fileSize = ((JsonNumber) datafile.get("fileSize")).longValueExact();
+			}
+			if (location.startsWith("/")) {
+				location = location.substring(1);
+			}
+			Path target = top.resolve(getServerFileName(idsUrl)).resolve(location);
+			Files.createDirectories(target.getParent());
+			if (Files.exists(target)) {
+				if (Files.size(target) == fileSize) {
+					Files.delete(file.toPath());
+					logger.debug("File " + target + " already present");
+					return null;
 				}
 			}
 
-			Status status = idsClient.getStatus(sessionId, new DataSelection().addDatafile(dfId));
-			logger.debug("Status " + status);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+			DataSelection data = new DataSelection().addDatafile(dfId);
+			Status status = idsClient.getStatus(sessionId, data);
 
+			if (status == Status.ONLINE) {
+				logger.debug("File " + dfId + " location " + location + " size " + fileSize + " bytes will be obtained");
+				Path temp = Files.createTempFile(target.getParent(), null, null);
+
+				try (InputStream in = idsClient.getData(sessionId, data, Flag.NONE, 0)) {
+					Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
+				} catch (IOException | NotImplementedException | BadRequestException | InsufficientPrivilegesException
+						| NotFoundException | InternalException | DataNotOnlineException e) {
+					Files.delete(temp);
+					return null;
+				}
+
+				Files.move(temp, target);
+				Files.delete(file.toPath());
+				logger.debug("File " + target + " retrieved");
+			} else if (status == Status.ARCHIVED) {
+				idsClient.restore(sessionId, data);
+				logger.debug("File " + dfId + " location " + location + " will be restored");
+			} else if (status == Status.RESTORING) {
+				logger.debug("File " + dfId + " location " + location + " is being restored");
+			}
+			return null;
+		}
 	}
 
-	private static void processGetInvestigation(String[] cmd) {
+	public class ProcessGetDatafiles implements Runnable {
+
+		@Override
+		public void run() {
+			int ncores = Runtime.getRuntime().availableProcessors();
+			ExecutorService threadPool = Executors.newFixedThreadPool(ncores * 2);
+			Map<File, Future<Void>> queued = new HashMap<>();
+
+			while (true) {
+				File[] files = dot.resolve("dfids").toFile().listFiles();
+				if (files.length != 0) {
+					for (File file : files) {
+						if (!queued.containsKey(file)) {
+							Future<Void> f = threadPool.submit(new ProcessOneDf(file));
+							queued.put(file, f);
+							logger.debug("Queued request to get " + file.getName());
+						}
+					}
+					Iterator<File> iter = queued.keySet().iterator();
+					while (iter.hasNext()) {
+						File file = iter.next();
+						if (queued.get(file).isDone()) {
+							try {
+								queued.get(file).get();
+							} catch (InterruptedException e) {
+								// Do nothing
+							} catch (ExecutionException e) {
+								Throwable c = e.getCause();
+								logger.debug("Get " + file + " failed with " + c.getClass() + " " + c.getMessage());
+							}
+							iter.remove();
+						}
+					}
+				}
+				try {
+					Thread.sleep(60000);
+				} catch (InterruptedException e) {
+					return;
+				}
+			}
+		}
+	}
+
+	private static void processGetInvestigation(String[] cmd) throws Exception {
 		int offset = 0;
 
 		IdsClient idsClient = null;
@@ -286,67 +478,80 @@ public class Server {
 			// Can't happen
 		}
 		String sessionId;
-		try {
-			sessionId = getSessionId(cmd[0]);
-			String icatUrl = idsClient.getIcatUrl().toString();
-			ICAT icatClient = new ICAT(icatUrl);
-			Session session = icatClient.getSession(sessionId);
-			while (true) {
-				String query = "SELECT df.id FROM Datafile df WHERE df.dataset.investigation.id = " + cmd[3]
-						+ " ORDER BY df.id LIMIT " + offset + ", 1000";
-				String jsonString = session.search(query);
-				logger.debug(jsonString);
-				try (JsonReader parser = Json.createReader(new ByteArrayInputStream(jsonString.getBytes()))) {
-					JsonArray dfids = parser.readArray();
-					for (JsonValue v : dfids) {
-						addRequest(cmd[0] + " GET Datafile " + v);
-					}
-					if (dfids.size() < 1000) {
-						break;
-					}
 
-					offset += 1000;
+		sessionId = getSessionId(cmd[0]);
+		String icatUrl = idsClient.getIcatUrl().toString();
+		ICAT icatClient = new ICAT(icatUrl);
+		Session session = icatClient.getSession(sessionId);
+		while (true) {
+			String query = "SELECT df.id FROM Datafile df WHERE df.dataset.investigation.id = " + cmd[3]
+					+ " ORDER BY df.id LIMIT " + offset + ", 1000";
+			String jsonString = session.search(query);
+			try (JsonReader parser = Json.createReader(new ByteArrayInputStream(jsonString.getBytes()))) {
+				JsonArray dfids = parser.readArray();
+				for (JsonValue v : dfids) {
+					addRequest(cmd[0] + " GET Datafile " + v);
 				}
+				if (dfids.size() < 1000) {
+					break;
+				}
+
+				offset += 1000;
 			}
-		} catch (Exception e) {
-			// TODO
-			logger.debug(e.getClass().getSimpleName() + " " + e.getMessage());
-			return;
 		}
 
 	}
 
-	protected static void addRequest(String request) {
+	private static void processGetDataset(String[] cmd) throws Exception {
+		int offset = 0;
+
+		IdsClient idsClient = null;
+		try {
+			idsClient = new IdsClient(new URL(cmd[0]));
+		} catch (MalformedURLException e1) {
+			// Can't happen
+		}
+		String sessionId;
+
+		sessionId = getSessionId(cmd[0]);
+		String icatUrl = idsClient.getIcatUrl().toString();
+		ICAT icatClient = new ICAT(icatUrl);
+		Session session = icatClient.getSession(sessionId);
+		while (true) {
+			String query = "SELECT df.id FROM Datafile df WHERE df.dataset.id = " + cmd[3] + " ORDER BY df.id LIMIT "
+					+ offset + ", 1000";
+			String jsonString = session.search(query);
+			try (JsonReader parser = Json.createReader(new ByteArrayInputStream(jsonString.getBytes()))) {
+				JsonArray dfids = parser.readArray();
+				for (JsonValue v : dfids) {
+					addRequest(cmd[0] + " GET Datafile " + v);
+				}
+				if (dfids.size() < 1000) {
+					break;
+				}
+
+				offset += 1000;
+			}
+		}
+
+	}
+
+	private static void addRequest(String request) throws FileNotFoundException {
 		try (PrintWriter os = new PrintWriter(dot.resolve("requests").resolve(UUID.randomUUID().toString()).toFile())) {
 			os.println(request);
-		} catch (FileNotFoundException e) {
-			logger.error(e.getMessage());
 		}
 	}
 
-	protected static String getSessionId(String idsUrl) throws IOException {
-		String filename = getServerFile(idsUrl);
+	private static String getSessionId(String idsUrl) throws IOException {
+		String filename = getServerFileName(idsUrl);
 		try (BufferedReader br = new BufferedReader(new FileReader(dot.resolve("servers").resolve(filename).toFile()));) {
 			return br.readLine();
 		}
 	}
 
-	protected static String getServerFile(String urlString) throws IOException {
-		try {
-
-			URL url = new URL(urlString);
-			url = new URL(url.getProtocol(), url.getHost().toLowerCase(), url.getPort(), url.getFile());
-
-			MessageDigest digest = MessageDigest.getInstance("SHA-1");
-			byte[] hashedBytes = digest.digest(url.toString().getBytes("UTF-8"));
-			StringBuilder sb = new StringBuilder();
-			for (int i = 0; i < hashedBytes.length; i++) {
-				sb.append(Integer.toString((hashedBytes[i] & 0xff) + 0x100, 16).substring(1));
-			}
-			return sb.toString();
-		} catch (Exception e) {
-			throw new IOException("Failed to decode " + urlString + ":" + e.getMessage());
-		}
+	private static String getServerFileName(String urlString) throws IOException {
+		URL url = new URL(urlString);
+		return url.getHost().toLowerCase();
 	}
 
 	private static void report(HttpExchange httpExchange, int rc, String code, String msg) {
