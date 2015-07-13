@@ -189,6 +189,54 @@ public class Server {
 
 		});
 
+		httpServer.createContext("/status", new HttpHandler() {
+
+			public void handle(HttpExchange httpExchange) throws IOException {
+				if (!httpExchange.getRequestMethod().equals("GET")) {
+					report(httpExchange, 404, "BadRequestException", "GET expected");
+				} else {
+
+					ByteArrayOutputStream baos = new ByteArrayOutputStream();
+					JsonGenerator gen = Json.createGenerator(baos);
+					try {
+						gen.writeStartObject().write("requests", dot.resolve("requests").toFile().listFiles().length)
+								.write("dfids", dot.resolve("dfids").toFile().listFiles().length)
+								.writeStartArray("servers");
+						for (File file : dot.resolve("servers").toFile().listFiles()) {
+							try (BufferedReader br = new BufferedReader(new FileReader(file));) {
+								br.readLine();
+								gen.write(br.readLine());
+							}
+						}
+						gen.writeEnd().writeEnd().close();
+						byte[] out = baos.toString().getBytes("UTF-8");
+						httpExchange.sendResponseHeaders(200, out.length);
+						OutputStream os = httpExchange.getResponseBody();
+						os.write(out);
+						os.close();
+					} catch (Exception e) {
+						logger.error(e.getMessage());
+					}
+				}
+			}
+		});
+
+		httpServer.createContext("/ping", new HttpHandler() {
+
+			public void handle(HttpExchange httpExchange) {
+				if (!httpExchange.getRequestMethod().equals("GET")) {
+					report(httpExchange, 404, "BadRequestException", "GET expected");
+				} else {
+					try {
+						httpExchange.sendResponseHeaders(200, 0);
+						httpExchange.close();
+					} catch (Exception e) {
+						logger.error(e.getMessage());
+					}
+				}
+			}
+		});
+
 		httpServer.createContext("/login", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {

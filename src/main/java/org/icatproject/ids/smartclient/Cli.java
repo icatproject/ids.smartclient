@@ -2,6 +2,7 @@ package org.icatproject.ids.smartclient;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 
@@ -17,13 +18,40 @@ import org.apache.http.HttpResponse;
 import org.apache.http.ParseException;
 import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 public class Cli {
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
 
 		try {
+
+			try {
+				URI uri = new URIBuilder("http://localhost:8888").setPath("/ping").build();
+				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+					HttpGet httpGet = new HttpGet(uri);
+					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
+						Cli.expectNothing(response);
+					}
+				}
+			} catch (IOException e) {
+				
+				ProcessBuilder pb = new ProcessBuilder("src/main/scripts/server.sh");
+				Process p = pb.start();
+				p.waitFor();
+
+				int exitValue = p.exitValue();
+				if (exitValue != 0) {
+					System.err.println("Unable to start server please take a look at ~/.smartclient/log");
+					System.exit(1);
+				}
+				System.out.println("Server has been started");
+			}
+
 			if (args.length == 0) {
 				printHelp();
 				System.exit(1);
@@ -34,8 +62,8 @@ public class Cli {
 					new Login(rest);
 				} else if (cmd.equals("get")) {
 					new Get(rest);
-				} else if (cmd.equals("put")) {
-					new Put(rest);
+				} else if (cmd.equals("status")) {
+					new Status(rest);
 				} else if (cmd.equals("help")) {
 					printHelp();
 				} else {
@@ -56,7 +84,7 @@ public class Cli {
 	}
 
 	private static void printHelp() {
-		System.out.println("First parameter must be one of help, login, get or put");
+		System.out.println("First parameter must be one of help, login, status or put");
 	}
 
 	static void checkStatus(HttpResponse response) throws IOException {
