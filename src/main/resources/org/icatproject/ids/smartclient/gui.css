@@ -1,0 +1,17 @@
+.label {
+    -fx-font-size: 12.0px;
+    -fx-font-weight: normal;
+}
+
+.text {
+    -fx-font-size: 12.0px;
+    -fx-font-weight: bold;
+}
+
+#status {
+   -fx-fill: FIREBRICK;
+}
+
+#title {
+    -fx-font-size: 24.0px;
+}

@@ -39,8 +39,8 @@ public class Cli {
 					}
 				}
 			} catch (IOException e) {
-				
-				ProcessBuilder pb = new ProcessBuilder("src/main/scripts/server.sh");
+
+				ProcessBuilder pb = new ProcessBuilder("sh", "/opt/smartclient/app/server.sh");
 				Process p = pb.start();
 				p.waitFor();
 
