@@ -286,10 +286,14 @@ public class Server {
 
 		Path home = Paths.get(System.getProperty("user.home"));
 		dot = home.resolve(".smartclient");
-		// TODO Fix for windows
-		FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(PosixFilePermissions
-				.fromString("rwx------"));
-		Files.createDirectories(dot, attr);
+	
+		try {
+			FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(PosixFilePermissions
+					.fromString("rwx------"));
+			Files.createDirectories(dot, attr);
+		} catch (UnsupportedOperationException e) {
+			Files.createDirectories(dot);
+		}
 		Files.createDirectories(dot.resolve("servers"));
 		Files.createDirectories(dot.resolve("requests"));
 		Files.createDirectories(dot.resolve("dfids"));

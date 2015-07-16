@@ -66,14 +66,22 @@ public class GUIController {
 					}
 					setStatus("Server is running");
 				}
-			} catch (IOException e) {
+			} catch (Exception e) {
+				setStatus("Server is being started");
 				ProcessBuilder pb = new ProcessBuilder("sh", "/opt/smartclient/app/server.sh");
-				Process p = pb.start();
+				Process p;
+				try {
+					p = pb.start();
+				} catch (Exception e1) {
+					setStatus("Unable to start server - " + e1.getMessage());
+					return;
+				}
 				p.waitFor();
 
 				int exitValue = p.exitValue();
 				if (exitValue != 0) {
-					setStatus("Unable to start server please take a look at ~/.smartclient/log");
+					setStatus("Unable to start server - please take a look at ~/.smartclient/log");
+					return;
 				} else {
 					setStatus("Server has been started");
 				}
