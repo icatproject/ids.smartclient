@@ -1,6 +1,5 @@
 package org.icatproject.ids.smartclient;
 
-import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
 

@@ -59,6 +59,7 @@ import org.icatproject.ids.client.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -178,10 +179,8 @@ public class Server {
 						}
 
 						singleThreadPool.submit(new RestoreTask(idsClient, sessionId, data));
-
-						httpExchange.sendResponseHeaders(200, 0);
+						corsify(httpExchange, 200, 0);
 						httpExchange.close();
-
 					}
 
 				}
@@ -204,13 +203,28 @@ public class Server {
 								.writeStartArray("servers");
 						for (File file : dot.resolve("servers").toFile().listFiles()) {
 							try (BufferedReader br = new BufferedReader(new FileReader(file));) {
-								br.readLine();
-								gen.write(br.readLine());
+								String sessionId = br.readLine();
+								String idsUrl = br.readLine();
+								IdsClient idsClient = new IdsClient(new URL(idsUrl));
+								String icatUrl;
+								try {
+									icatUrl = idsClient.getIcatUrl().toString();
+									ICAT icatClient = new ICAT(icatUrl);
+									Session session = icatClient.getSession(sessionId);
+									String user = session.getUserName();
+									gen.writeStartObject().write("idsUrl", idsUrl).write("user", user).writeEnd();
+								} catch (InternalException | NotImplementedException | BadRequestException
+										| URISyntaxException e) {
+									report(httpExchange, 500, "Possible internal error",
+											e.getClass() + " " + e.getMessage());
+								} catch (IcatException e) {
+									gen.writeStartObject().write("idsUrl", idsUrl).writeEnd();
+								}
 							}
 						}
 						gen.writeEnd().writeEnd().close();
 						byte[] out = baos.toString().getBytes("UTF-8");
-						httpExchange.sendResponseHeaders(200, out.length);
+						corsify(httpExchange, 200, out.length);
 						OutputStream os = httpExchange.getResponseBody();
 						os.write(out);
 						os.close();
@@ -228,7 +242,7 @@ public class Server {
 					report(httpExchange, 404, "BadRequestException", "GET expected");
 				} else {
 					try {
-						httpExchange.sendResponseHeaders(200, 0);
+						corsify(httpExchange, 200, 0);
 						httpExchange.close();
 					} catch (Exception e) {
 						logger.error(e.getMessage());
@@ -276,7 +290,7 @@ public class Server {
 							os.println(idsUrl);
 						}
 					}
-					httpExchange.sendResponseHeaders(200, 0);
+					corsify(httpExchange, 200, 0);
 					httpExchange.getResponseBody().close();
 				}
 			}
@@ -286,7 +300,7 @@ public class Server {
 
 		Path home = Paths.get(System.getProperty("user.home"));
 		dot = home.resolve(".smartclient");
-	
+
 		try {
 			FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(PosixFilePermissions
 					.fromString("rwx------"));
@@ -520,6 +534,13 @@ public class Server {
 		}
 	}
 
+	private static void corsify(HttpExchange httpExchange, int sc, int length) throws IOException {
+		Headers headers = httpExchange.getResponseHeaders();
+		headers.add("Access-Control-Allow-Origin", "*");
+		headers.add("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT");
+		httpExchange.sendResponseHeaders(sc, length);
+	}
+
 	private static void processGetInvestigation(String[] cmd) throws Exception {
 		int offset = 0;
 
@@ -613,7 +634,7 @@ public class Server {
 		try {
 			gen.writeStartObject().write("code", code).write("message", msg).writeEnd().close();
 			byte[] out = baos.toString().getBytes("UTF-8");
-			httpExchange.sendResponseHeaders(400, out.length);
+			corsify(httpExchange, 400, out.length);
 			OutputStream os = httpExchange.getResponseBody();
 			os.write(out);
 			os.close();
