@@ -13,5 +13,5 @@
 }
 
 #title {
-    -fx-font-size: 24.0px;
+    -fx-font-size: 24.0px; -fx-fill: FIREBRICK;
 }

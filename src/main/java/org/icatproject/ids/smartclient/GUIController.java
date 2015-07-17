@@ -7,10 +7,13 @@ import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.fxml.FXML;
+import javafx.scene.control.Label;
+import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
 
 import javax.json.Json;
+import javax.json.JsonArray;
 import javax.json.JsonException;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
@@ -32,6 +35,12 @@ public class GUIController {
 
 	@FXML
 	private Text status;
+
+	@FXML
+	private Label title;
+
+	@FXML
+	private GridPane table;
 
 	private void setStatus(String msg) {
 		status.setText(msg);
@@ -100,6 +109,13 @@ public class GUIController {
 							JsonObject json = jsonReader.readObject();
 							setRequests(json.getJsonNumber("requests").intValueExact());
 							setDfids(json.getJsonNumber("dfids").intValueExact());
+							JsonArray servers = json.getJsonArray("servers");
+							for (int n = 0; n < servers.size(); n++) {
+								JsonObject server = servers.getJsonObject(n);
+								table.add(new Text(server.getString("idsUrl")), 0, n + 1);
+								table.add(new Text(server.getString("user", "Not logged in")), 1, n + 1);
+							}
+
 						} catch (JsonException e) {
 							setStatus("Internal error " + jsonString + " is not json");
 						}
