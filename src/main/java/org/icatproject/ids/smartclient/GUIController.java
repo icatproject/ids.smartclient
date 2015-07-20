@@ -34,6 +34,8 @@ public class GUIController {
 	@FXML
 	private Text status;
 
+	private boolean windows;
+
 	private void setStatus(String msg) {
 		status.setText(msg);
 	}
@@ -48,6 +50,7 @@ public class GUIController {
 
 	@FXML
 	private void initialize() {
+		windows = System.getProperty("os.name").startsWith("Windows");
 		update();
 		Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(10), ae -> update()));
 		timeline.setCycleCount(Animation.INDEFINITE);
@@ -68,7 +71,14 @@ public class GUIController {
 				}
 			} catch (Exception e) {
 				setStatus("Server is being started");
-				ProcessBuilder pb = new ProcessBuilder("sh", "/opt/smartclient/app/server.sh");
+				
+				ProcessBuilder pb;
+				if (windows) {
+					String home = System.getProperty("user.home");
+					pb = new ProcessBuilder(home + "/AppData/Local/smartclient/server");
+				} else {
+					pb = new ProcessBuilder("sh", "/opt/smartclient/app/server.sh");
+				}
 				Process p;
 				try {
 					p = pb.start();

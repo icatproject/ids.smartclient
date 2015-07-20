@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="ids.smartclient" default="default" basedir="." xmlns:fx="javafx:com.sun.javafx.tools.ant">
+<project name="ids.smartclient" default="default" basedir="." xmlns:fx="javafx:com.sun.javafx.tools.ant" xmlns:if="ant:if" xmlns:unless="ant:unless">
 
+	
+	 <condition property="windows">
+	   <os family="windows"/>
+	 </condition>
+	
+	 <echo if:set="windows">running on Windows</echo>
+	 <echo unless:set="windows">not running on Windows</echo>
+	
+	
 	<target name="getlibs" depends="clean">
 		<copy todir="build/lib">
 			<fileset dir="${user.home}/.m2/repository/commons-codec/commons-codec/1.6">
@@ -150,8 +159,9 @@
 				<fx:fileset dir="." includes="LICENSE.txt" type="license" />
 			</fx:resources>
 
-			<fx:secondaryLauncher mainClass="org.icatproject.ids.smartclient.GUI" name="gui" />
-			<fx:secondaryLauncher mainClass="org.icatproject.ids.smartclient.Cli" name="cli" />
+			<fx:preferences install="false" menu="true" shortcut="true" />
+
+			<fx:secondaryLauncher unless:set="windows" mainClass="org.icatproject.ids.smartclient.Cli" name="cli" />
 			<fx:secondaryLauncher mainClass="org.icatproject.ids.smartclient.Server" name="server" />
 		</fx:deploy>
 
