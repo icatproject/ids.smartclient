@@ -19,6 +19,7 @@ public class GUI extends Application {
 			scene.getStylesheets().add(getClass().getResource("gui.css").toExternalForm());
 			primaryStage.setScene(scene);
 			primaryStage.setTitle("Smartclient");
+			// ScenicView.show(scene);
 			primaryStage.show();
 		} catch (Exception e) {
 			e.printStackTrace();

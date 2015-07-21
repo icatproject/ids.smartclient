@@ -3,15 +3,27 @@ package org.icatproject.ids.smartclient;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
+import java.net.URL;
 
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import javax.json.Json;
+import javax.json.JsonArray;
 import javax.json.JsonException;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
@@ -36,6 +48,15 @@ public class GUIController {
 
 	private boolean windows;
 
+	@FXML
+	private Label title;
+
+	@FXML
+	Button addServer;
+
+	@FXML
+	private GridPane table;
+
 	private void setStatus(String msg) {
 		status.setText(msg);
 	}
@@ -57,6 +78,24 @@ public class GUIController {
 		timeline.play();
 	}
 
+	@FXML
+	private void addServer(ActionEvent event) {
+		try {
+			Stage stage = new Stage();
+			stage.setTitle("TuneUs");
+			URL uri = getClass().getResource("addServer.fxml");
+			Parent p = FXMLLoader.load(uri);
+			Scene scene = new Scene(p);
+			stage.setScene(scene);
+			// scene.getStylesheets().add(getClass().getResource("gui.css").toExternalForm());
+			stage.initModality(Modality.WINDOW_MODAL);
+			stage.initOwner(((Node) event.getSource()).getScene().getWindow());
+			stage.show();
+		} catch (IOException e) {
+			setStatus(e.getClass() + " " + e.getMessage());
+		}
+	}
+
 	private void update() {
 		try {
 
@@ -71,7 +110,7 @@ public class GUIController {
 				}
 			} catch (Exception e) {
 				setStatus("Server is being started");
-				
+
 				ProcessBuilder pb;
 				if (windows) {
 					String home = System.getProperty("user.home");
@@ -111,6 +150,13 @@ public class GUIController {
 							JsonObject json = jsonReader.readObject();
 							setRequests(json.getJsonNumber("requests").intValueExact());
 							setDfids(json.getJsonNumber("dfids").intValueExact());
+							JsonArray servers = json.getJsonArray("servers");
+							for (int n = 0; n < servers.size(); n++) {
+								JsonObject server = servers.getJsonObject(n);
+								table.add(new Text(server.getString("idsUrl")), 0, n + 1);
+								table.add(new Text(server.getString("user", "Not logged in")), 1, n + 1);
+							}
+
 						} catch (JsonException e) {
 							setStatus("Internal error " + jsonString + " is not json");
 						}

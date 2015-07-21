@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.control.cell.*?>
+<?import fxmltableview.*?>
+<?import javafx.collections.*?>
+
+<BorderPane fx:controller="org.icatproject.ids.smartclient.AddServerController"
+	xmlns:fx="http://javafx.com/fxml">
+	<top>
+		<VBox>
+			<padding>
+				<Insets top="25" right="25" bottom="10" left="25" />
+			</padding>
+			<Label text="Add an IDS" />
+			<GridPane hgap="10" vgap="10">
+
+			<Label text="URL of IDS:" GridPane.columnIndex="0"
+			GridPane.rowIndex="0" />
+
+			<TextField fx:id="idsUrl" GridPane.columnIndex="1"
+			GridPane.rowIndex="0" />
+
+			<Label text="Authentication method:" GridPane.columnIndex="0"
+			GridPane.rowIndex="1" />
+
+<!-- 			<ChoiceBox fx:id="method" GridPane.columnIndex="1" -->
+<!-- 			GridPane.rowIndex="1"> -->
+<!-- 			<items> -->
+<!-- 			<FXCollections fx:factory="observableArrayList"> -->
+<!-- 			<String fx:value="2 minutes" /> -->
+<!-- 			<String fx:value="5 minutes" /> -->
+<!-- 			<String fx:value="15 minutes" /> -->
+<!-- 			</FXCollections> -->
+<!-- 			</items> -->
+<!-- 			</ChoiceBox -->
+
+
+			</GridPane>
+
+
+
+
+		</VBox>
+
+	</top>
+
+
+</BorderPane>
