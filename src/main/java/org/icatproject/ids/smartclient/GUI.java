@@ -2,6 +2,8 @@ package org.icatproject.ids.smartclient;
 
 import java.net.URL;
 
+import org.scenicview.ScenicView;
+
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -18,6 +20,7 @@ public class GUI extends Application {
 			Scene scene = new Scene(p);
 			scene.getStylesheets().add(getClass().getResource("gui.css").toExternalForm());
 			primaryStage.setScene(scene);
+			ScenicView.show(scene);
 			primaryStage.show();
 		} catch (Exception e) {
 			e.printStackTrace();

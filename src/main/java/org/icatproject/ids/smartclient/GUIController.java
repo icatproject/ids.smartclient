@@ -1,15 +1,25 @@
 package org.icatproject.ids.smartclient;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
+import java.net.URL;
 
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import javax.json.Json;
@@ -40,6 +50,9 @@ public class GUIController {
 	private Label title;
 
 	@FXML
+	Button addServer;
+
+	@FXML
 	private GridPane table;
 
 	private void setStatus(String msg) {
@@ -60,6 +73,24 @@ public class GUIController {
 		Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(10), ae -> update()));
 		timeline.setCycleCount(Animation.INDEFINITE);
 		timeline.play();
+	}
+
+	@FXML
+	private void addServer(ActionEvent event) {
+		try {
+			Stage stage = new Stage();
+			stage.setTitle("TuneUs");
+			URL uri = getClass().getResource("addServer.fxml");
+			Parent p = FXMLLoader.load(uri);
+			Scene scene = new Scene(p);
+			stage.setScene(scene);
+			// scene.getStylesheets().add(getClass().getResource("gui.css").toExternalForm());
+			stage.initModality(Modality.WINDOW_MODAL);
+			stage.initOwner(((Node) event.getSource()).getScene().getWindow());
+			stage.show();
+		} catch (IOException e) {
+			setStatus(e.getClass() + " " + e.getMessage());
+		}
 	}
 
 	private void update() {

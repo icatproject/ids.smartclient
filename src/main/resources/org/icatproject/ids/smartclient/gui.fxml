@@ -15,7 +15,7 @@
 			<padding>
 				<Insets top="25" right="25" bottom="10" left="25" />
 			</padding>
-			<Label fx:id="title" text="IDS smartclient" />
+			<Label fx:id="maintitle" text="IDS smartclient" />
 
 			<GridPane hgap="10" vgap="10">
 
@@ -37,12 +37,15 @@
 				<Text fx:id="dfids" GridPane.columnIndex="1" GridPane.rowIndex="2" />
 
 			</GridPane>
+			
+			<Button text="Add an IDS" onAction="#addServer"/>
 
 			<GridPane fx:id="table" hgap="10" vgap="5">
 				<padding>
 					<Insets top="10" right="0" bottom="0" left="0" />
 				</padding>
-				<Label text="Server" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+				<Label text="Server" GridPane.columnIndex="0"
+					GridPane.rowIndex="0" />
 				<Label text="User" GridPane.columnIndex="1" GridPane.rowIndex="0" />
 			</GridPane>
 		</VBox>
