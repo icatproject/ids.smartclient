@@ -13,7 +13,7 @@ public class GUI extends Application {
 	public void start(Stage primaryStage) {
 
 		try {
-			URL uri = getClass().getResource("gui.fxml");
+			URL uri = getClass().getResource("addServer.fxml");
 			Parent p = FXMLLoader.load(uri);
 			Scene scene = new Scene(p);
 			scene.getStylesheets().add(getClass().getResource("gui.css").toExternalForm());

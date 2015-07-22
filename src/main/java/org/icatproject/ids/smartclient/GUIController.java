@@ -125,14 +125,16 @@ public class GUIController {
 					setStatus("Unable to start server - " + e1.getMessage());
 					return;
 				}
-				p.waitFor();
+				if (!windows) {
+					p.waitFor();
 
-				int exitValue = p.exitValue();
-				if (exitValue != 0) {
-					setStatus("Unable to start server - please take a look at ~/.smartclient/log");
-					return;
-				} else {
-					setStatus("Server has been started");
+					int exitValue = p.exitValue();
+					if (exitValue != 0) {
+						setStatus("Unable to start server - please take a look at ~/.smartclient/log");
+						return;
+					} else {
+						setStatus("Server has been started");
+					}
 				}
 			}
 
