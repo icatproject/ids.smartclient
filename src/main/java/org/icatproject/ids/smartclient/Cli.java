@@ -60,6 +60,8 @@ public class Cli {
 				String[] rest = Arrays.copyOfRange(args, 1, args.length);
 				if (cmd.equals("login")) {
 					new Login(rest);
+				} else if (cmd.equals("logout")) {
+					new Logout(rest);
 				} else if (cmd.equals("get")) {
 					new Get(rest);
 				} else if (cmd.equals("status")) {

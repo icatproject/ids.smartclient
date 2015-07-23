@@ -8,6 +8,7 @@ import java.net.URL;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -153,10 +154,15 @@ public class GUIController {
 							setRequests(json.getJsonNumber("requests").intValueExact());
 							setDfids(json.getJsonNumber("dfids").intValueExact());
 							JsonArray servers = json.getJsonArray("servers");
+							ObservableList<Node> children = table.getChildren();
+							children.remove(2, children.size());
 							for (int n = 0; n < servers.size(); n++) {
 								JsonObject server = servers.getJsonObject(n);
 								table.add(new Text(server.getString("idsUrl")), 0, n + 1);
 								table.add(new Text(server.getString("user", "Not logged in")), 1, n + 1);
+							}
+							if (table.getScene() != null) {
+								table.getScene().getWindow().sizeToScene();
 							}
 
 						} catch (JsonException e) {

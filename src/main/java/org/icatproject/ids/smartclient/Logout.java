@@ -14,7 +14,6 @@ import javax.json.stream.JsonGenerator;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
-import joptsimple.OptionSpec;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -26,16 +25,10 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 
-public class Login {
+public class Logout {
 
-	public Login(String[] rest) throws IOException, URISyntaxException {
+	public Logout(String[] rest) throws IOException, URISyntaxException {
 		OptionParser parser = new OptionParser();
-
-		OptionSpec<String> plugin = parser.acceptsAll(asList("plugin", "p")).withRequiredArg().ofType(String.class)
-				.describedAs("plugin");
-
-		OptionSpec<String> sessionId = parser.acceptsAll(asList("sid", "s")).withRequiredArg().ofType(String.class)
-				.describedAs("sessionId");
 
 		parser.acceptsAll(asList("h", "?", "help"), "show help").forHelp();
 
@@ -47,46 +40,18 @@ public class Login {
 			parser.printHelpOn(System.out);
 		} else {
 
-			if (options.has(plugin) && options.has(sessionId)) {
-				Cli.abort("Can't specify plugin and sessionId");
-			}
-
-			if (!options.has(plugin) && !options.has(sessionId)) {
-				Cli.abort("Must specify plugin or sessionId");
-			}
-
-			if (options.has(sessionId)) {
-				if (options.nonOptionArguments().size() != 1) {
-					Cli.abort("No idsUrl specified");
-				}
-			} else {
-				if (options.nonOptionArguments().size() % 2 != 1) {
-					Cli.abort("idsUrl must be followed by even number of credentials");
-				}
+			if (options.nonOptionArguments().size() != 1) {
+				Cli.abort("idsUrl must be specified");
 			}
 
 			String idsUrl = (String) options.nonOptionArguments().get(0);
 
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			JsonGenerator gen = Json.createGenerator(baos);
-			gen.writeStartObject().write("idsUrl", idsUrl);
-
-			if (options.has(sessionId)) {
-				gen.write("sessionId", options.valueOf(sessionId));
-			} else {
-				gen.write("plugin", options.valueOf(plugin));
-				gen.writeStartObject("credentials");
-				for (int i = 1; i < options.nonOptionArguments().size(); i += 2) {
-					gen.write((String) options.nonOptionArguments().get(i),
-							(String) options.nonOptionArguments().get(i + 1));
-				}
-				gen.writeEnd();
-			}
-
-			gen.writeEnd().close();
+			gen.writeStartObject().write("idsUrl", idsUrl).writeEnd().close();
 			System.out.println(baos.toString());
 
-			URI uri = new URIBuilder("http://localhost:8888").setPath("/login").build();
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/logout").build();
 
 			List<NameValuePair> formparams = new ArrayList<>();
 			formparams.add(new BasicNameValuePair("json", baos.toString()));

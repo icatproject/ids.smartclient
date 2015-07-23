@@ -26,6 +26,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -257,28 +258,34 @@ public class Server {
 				if (!httpExchange.getRequestMethod().equals("POST")) {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
-					BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));
-					String line = in.readLine();
-					if (line != null) {
-						String[] pairs = line.split("&");
-						Map<String, String> map = new HashMap<>();
-						for (String pair : pairs) {
-							int idx = pair.indexOf("=");
-							map.put(URLDecoder.decode(pair.substring(0, idx), "UTF-8"),
-									URLDecoder.decode(pair.substring(idx + 1), "UTF-8"));
-						}
-						String idsUrl = map.get("idsUrl");
-						String filename = getServerFileName(idsUrl);
-						String sessionId = map.get("sessionId");
-
+					byte[] jsonBytes;
+					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
+						String line = in.readLine();
+						int idx = line.indexOf("=");
+						jsonBytes = URLDecoder.decode(line.substring(idx + 1), "UTF-8").getBytes("UTF-8");
+					}
+					try (JsonReader reader = Json.createReader(new ByteArrayInputStream(jsonBytes))) {
+						JsonObject json = reader.readObject();
+						String idsUrl = json.getString("idsUrl");
+						String sessionId = json.containsKey("sessionId") ? json.getString("sessionId") : null;
+						String plugin = json.containsKey("plugin") ? json.getString("plugin") : null;
 						IdsClient idsClient = new IdsClient(new URL(idsUrl));
+						String filename = getServerFileName(idsUrl);
 
-						String icatUrl;
 						try {
-							icatUrl = idsClient.getIcatUrl().toString();
+							String icatUrl = idsClient.getIcatUrl().toString();
 							ICAT icatClient = new ICAT(icatUrl);
-							Session session = icatClient.getSession(sessionId);
-							session.refresh();
+							if (sessionId == null) {
+								JsonObject credentials = json.getJsonObject("credentials");
+								Map<String, String> credentialMap = new HashMap<>();
+								for (Entry<String, JsonValue> entry : credentials.entrySet()) {
+									credentialMap.put(entry.getKey(), ((JsonString) entry.getValue()).getString());
+								}
+								sessionId = icatClient.login(plugin, credentialMap).getId();
+							} else {
+								Session session = icatClient.getSession(sessionId);
+								session.refresh();
+							}
 						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
 							report(httpExchange, 500, "Possible internal error", e.getClass() + " " + e.getMessage());
 						} catch (IcatException e) {
@@ -289,6 +296,53 @@ public class Server {
 							os.println(sessionId);
 							os.println(idsUrl);
 						}
+
+					} catch (Exception e) {
+						e.printStackTrace();
+						report(httpExchange, 403, "Unexpected error", e.getClass() + " " + e.getMessage());
+					}
+					corsify(httpExchange, 200, 0);
+					httpExchange.getResponseBody().close();
+				}
+			}
+		});
+
+		httpServer.createContext("/logout", new HttpHandler() {
+
+			public void handle(HttpExchange httpExchange) throws IOException {
+				if (!httpExchange.getRequestMethod().equals("POST")) {
+					report(httpExchange, 404, "BadRequestException", "POST expected");
+				} else {
+					byte[] jsonBytes;
+					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
+						String line = in.readLine();
+						int idx = line.indexOf("=");
+						jsonBytes = URLDecoder.decode(line.substring(idx + 1), "UTF-8").getBytes("UTF-8");
+					}
+					try (JsonReader reader = Json.createReader(new ByteArrayInputStream(jsonBytes))) {
+						JsonObject json = reader.readObject();
+						String idsUrl = json.getString("idsUrl");
+						IdsClient idsClient = new IdsClient(new URL(idsUrl));
+						String filename = getServerFileName(idsUrl);
+
+						try {
+							String sessionId = getSessionId(idsUrl);
+							String icatUrl = idsClient.getIcatUrl().toString();
+							ICAT icatClient = new ICAT(icatUrl);
+							Session session = icatClient.getSession(sessionId);
+							session.logout();
+						} catch (Exception e) {
+							// Ignore
+						}
+						try {
+							Files.delete(dot.resolve("servers").resolve(filename));
+						} catch (Exception e) {
+							// Ignore
+						}
+
+					} catch (Exception e) {
+						e.printStackTrace();
+						report(httpExchange, 403, "Unexpected error", e.getClass() + " " + e.getMessage());
 					}
 					corsify(httpExchange, 200, 0);
 					httpExchange.getResponseBody().close();
