@@ -192,6 +192,7 @@ public class Server {
 		httpServer.createContext("/status", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
+				logger.debug("Status request received");
 				if (!httpExchange.getRequestMethod().equals("GET")) {
 					report(httpExchange, 404, "BadRequestException", "GET expected");
 				} else {
@@ -218,6 +219,7 @@ public class Server {
 										| URISyntaxException e) {
 									report(httpExchange, 500, "Possible internal error",
 											e.getClass() + " " + e.getMessage());
+									return;
 								} catch (IcatException e) {
 									gen.writeStartObject().write("idsUrl", idsUrl).writeEnd();
 								}
@@ -255,6 +257,7 @@ public class Server {
 		httpServer.createContext("/login", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
+				logger.debug("Login request received");
 				if (!httpExchange.getRequestMethod().equals("POST")) {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
@@ -288,8 +291,10 @@ public class Server {
 							}
 						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
 							report(httpExchange, 500, "Possible internal error", e.getClass() + " " + e.getMessage());
+							return;
 						} catch (IcatException e) {
 							report(httpExchange, 403, "ICAT reports", e.getClass() + " " + e.getMessage());
+							return;
 						}
 
 						try (PrintWriter os = new PrintWriter(dot.resolve("servers").resolve(filename).toFile())) {
@@ -300,6 +305,7 @@ public class Server {
 					} catch (Exception e) {
 						e.printStackTrace();
 						report(httpExchange, 403, "Unexpected error", e.getClass() + " " + e.getMessage());
+						return;
 					}
 					corsify(httpExchange, 200, 0);
 					httpExchange.getResponseBody().close();
@@ -343,6 +349,7 @@ public class Server {
 					} catch (Exception e) {
 						e.printStackTrace();
 						report(httpExchange, 403, "Unexpected error", e.getClass() + " " + e.getMessage());
+						return;
 					}
 					corsify(httpExchange, 200, 0);
 					httpExchange.getResponseBody().close();
@@ -405,7 +412,7 @@ public class Server {
 							session.refresh();
 						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
 							logger.warn("RefreshTask possible internal error for " + file + " " + " for Icat "
-									+ icatUrl + e.getMessage());
+									+ icatUrl + " " + e.getMessage());
 						} catch (IcatException e) {
 							logger.debug("ICAT reports " + e.getClass() + " " + e.getMessage());
 							Files.delete(file.toPath());

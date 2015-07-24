@@ -1,6 +1,20 @@
 package org.icatproject.ids.smartclient;
 
+import java.io.IOException;
+import java.io.StringReader;
 import java.net.URL;
+
+import javax.json.Json;
+import javax.json.JsonException;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.ParseException;
+import org.apache.http.StatusLine;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.util.EntityUtils;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -29,5 +43,49 @@ public class GUI extends Application {
 
 	public static void main(String[] args) {
 		launch(args);
+	}
+	
+	static void expectNothing(CloseableHttpResponse response) throws IOException {
+		checkStatus(response);
+		HttpEntity entity = response.getEntity();
+		if (entity != null) {
+			if (!EntityUtils.toString(entity).isEmpty()) {
+				abort("No http entity expected in response");
+			}
+		}
+	}
+	
+	static void checkStatus(HttpResponse response) throws IOException {
+		StatusLine status = response.getStatusLine();
+		if (status == null) {
+			abort("Status line returned is empty");
+		}
+		int rc = status.getStatusCode();
+		if (rc / 100 != 2) {
+			HttpEntity entity = response.getEntity();
+			if (entity == null) {
+				abort("No explanation provided");
+			} else {
+				try {
+					String error = EntityUtils.toString(entity);
+					String code;
+					String message;
+					try (JsonReader jsonReader = Json.createReader(new StringReader(error))) {
+						JsonObject json = jsonReader.readObject();
+						code = json.getString("code");
+						message = json.getString("message");
+						abort(code + " " + message);
+					} catch (JsonException e) {
+						abort("Status code " + rc + " returned but message not json: " + error);
+					}
+				} catch (ParseException e) {
+					abort(e.getMessage());
+				}
+			}
+		}
+	}
+
+	static void abort(String msg) throws IOException {
+		throw new IOException(msg);
 	}
 }

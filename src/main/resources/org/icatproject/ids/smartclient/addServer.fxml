@@ -16,7 +16,7 @@
 			<padding>
 				<Insets top="25" right="25" bottom="10" left="25" />
 			</padding>
-			<Label text="Add an IDS" />
+
 			<GridPane hgap="10" vgap="10">
 
 				<Label text="URL of IDS:" GridPane.columnIndex="0"
@@ -32,14 +32,15 @@
 					GridPane.rowIndex="1">
 					<items>
 						<FXCollections fx:factory="observableArrayList">
+							<String fx:value="ldap" />
 							<String fx:value="sessionId" />
 							<String fx:value="db" />
-							<String fx:value="ldap" />
+							<String fx:value="simple" />
 							<String fx:value="anon" />
 						</FXCollections>
 					</items>
 					<value>
-						<String fx:value="sessionId" />
+						<String fx:value="ldap" />
 					</value>
 				</ChoiceBox>
 
@@ -50,6 +51,8 @@
 			<GridPane fx:id="credentials" hgap="10" vgap="10"></GridPane>
 
 			<Button text="Connect" onAction="#addServer" />
+
+			<Text fx:id="status" />
 
 
 		</VBox>

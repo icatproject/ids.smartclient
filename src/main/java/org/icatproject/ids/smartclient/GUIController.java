@@ -83,7 +83,7 @@ public class GUIController {
 	private void addServer(ActionEvent event) {
 		try {
 			Stage stage = new Stage();
-			stage.setTitle("TuneUs");
+			stage.setTitle("Add an IDS");
 			URL uri = getClass().getResource("addServer.fxml");
 			Parent p = FXMLLoader.load(uri);
 			Scene scene = new Scene(p);
@@ -105,7 +105,7 @@ public class GUIController {
 				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 					HttpGet httpGet = new HttpGet(uri);
 					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
-						Cli.expectNothing(response);
+						GUI.expectNothing(response);
 					}
 					setStatus("Server is running");
 				}
@@ -143,10 +143,10 @@ public class GUIController {
 			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 				HttpGet httpGet = new HttpGet(uri);
 				try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
-					Cli.checkStatus(response);
+					GUI.checkStatus(response);
 					HttpEntity entity = response.getEntity();
 					if (entity == null) {
-						Cli.abort("http entity expected in response");
+						GUI.abort("http entity expected in response");
 					} else {
 						String jsonString = EntityUtils.toString(entity);
 						try (JsonReader jsonReader = Json.createReader(new StringReader(jsonString))) {
