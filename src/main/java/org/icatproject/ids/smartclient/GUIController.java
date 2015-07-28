@@ -10,12 +10,14 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Text;
@@ -158,7 +160,14 @@ public class GUIController {
 							children.remove(2, children.size());
 							for (int n = 0; n < servers.size(); n++) {
 								JsonObject server = servers.getJsonObject(n);
-								table.add(new Text(server.getString("idsUrl")), 0, n + 1);
+								Hyperlink link = new Hyperlink(server.getString("idsUrl"));
+								link.setOnAction(new EventHandler<ActionEvent>() {
+								    @Override
+								    public void handle(ActionEvent e) {
+								        System.out.println("This link is clicked");
+								    }
+								});
+								table.add(new Hyperlink(server.getString("idsUrl")), 0, n + 1);
 								table.add(new Text(server.getString("user", "Not logged in")), 1, n + 1);
 							}
 							if (table.getScene() != null) {

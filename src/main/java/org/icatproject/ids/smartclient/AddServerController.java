@@ -81,7 +81,7 @@ public class AddServerController {
 			try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
 				GUI.expectNothing(response);
 			}
-			setStatus("Success!");
+			status.getScene().getWindow().hide();
 		} catch (Exception e) {
 			setStatus(e.getMessage());
 		}

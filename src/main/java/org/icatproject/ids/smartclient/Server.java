@@ -117,74 +117,67 @@ public class Server {
 				if (!httpExchange.getRequestMethod().equals("POST")) {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
-					String line = null;
+					byte[] jsonBytes;
 					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
-						line = in.readLine();
+						String line = in.readLine();
+						int idx = line.indexOf("=");
+						jsonBytes = URLDecoder.decode(line.substring(idx + 1), "UTF-8").getBytes("UTF-8");
 					}
-					if (line != null) {
-						IdsClient idsClient;
-						String sessionId;
-						DataSelection data;
+
+					IdsClient idsClient;
+					String sessionId;
+					DataSelection data = new DataSelection();
+
+					try (JsonReader reader = Json.createReader(new ByteArrayInputStream(jsonBytes))) {
+						JsonObject json = reader.readObject();
+						String idsUrl = json.getString("idsUrl");
+
+						idsClient = new IdsClient(new URL(idsUrl));
+
 						try {
-							String[] pairs = line.split("&");
-							Map<String, String> map = new HashMap<>();
-							for (String pair : pairs) {
-								int idx = pair.indexOf("=");
-								map.put(URLDecoder.decode(pair.substring(0, idx), "UTF-8"),
-										URLDecoder.decode(pair.substring(idx + 1), "UTF-8"));
-							}
-							logger.debug("POST parms " + map);
-							if (!map.containsKey("idsUrl")) {
-								report(httpExchange, 400, "BadRequestException", "idsUrl not specified");
-								return;
-							}
-							String idsUrl = map.get("idsUrl");
-							idsClient = new IdsClient(new URL(idsUrl));
-
-							try {
-								sessionId = getSessionId(idsUrl);
-							} catch (Exception e) {
-								report(httpExchange, 404, "BadRequestException", "Please login to " + idsUrl + " first");
-								return;
-							}
-							logger.debug("SessionId " + sessionId);
-
-							data = new DataSelection();
-							String list = map.get("investigationIds");
-							if (list != null) {
-								for (String one : list.split(",")) {
-									long num = Long.parseLong(one);
-									addRequest(idsUrl + " GET Investigation " + num);
-									data.addInvestigation(num);
-								}
-							}
-							list = map.get("datasetIds");
-							if (list != null) {
-								for (String one : list.split(",")) {
-									long num = Long.parseLong(one);
-									addRequest(idsUrl + " GET Dataset " + num);
-									data.addDataset(num);
-								}
-							}
-							list = map.get("datafileIds");
-							if (list != null) {
-								for (String one : list.split(",")) {
-									long num = Long.parseLong(one);
-									addRequest(idsUrl + " GET Datafile " + num);
-									data.addDatafile(num);
-								}
-							}
+							sessionId = getSessionId(idsUrl);
 						} catch (Exception e) {
-							report(httpExchange, 500, "UnexpectedException", e.getMessage());
+							report(httpExchange, 404, "BadRequestException", "Please login to " + idsUrl + " first");
 							return;
 						}
+						logger.debug("SessionId " + sessionId);
 
-						singleThreadPool.submit(new RestoreTask(idsClient, sessionId, data));
-						corsify(httpExchange, 200, 0);
-						httpExchange.close();
+						JsonArray list = json.getJsonArray("investigationIds");
+						if (list != null) {
+							for (JsonValue jv : list) {
+								long num = ((JsonNumber) jv).longValueExact();
+								addRequest(idsUrl + " GET Investigation " + num);
+								data.addInvestigation(num);
+							}
+						}
+
+						list = json.getJsonArray("datasetIds");
+						if (list != null) {
+							for (JsonValue jv : list) {
+								long num = ((JsonNumber) jv).longValueExact();
+								addRequest(idsUrl + " GET Dataset " + num);
+								data.addDataset(num);
+							}
+						}
+
+						list = json.getJsonArray("datafileIds");
+						if (list != null) {
+							for (JsonValue jv : list) {
+								long num = ((JsonNumber) jv).longValueExact();
+								addRequest(idsUrl + " GET Datafile " + num);
+								data.addDatafile(num);
+							}
+						}
+					} catch (Exception e) {
+						report(httpExchange, 500, "UnexpectedException", e.getMessage());
+						return;
 					}
 
+					singleThreadPool.submit(new RestoreTask(idsClient, sessionId, data));
+					corsify(httpExchange, 200, 0);
+					httpExchange.close();
 				}
+
 			}
 
 		});

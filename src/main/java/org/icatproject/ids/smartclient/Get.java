@@ -2,11 +2,15 @@ package org.icatproject.ids.smartclient;
 
 import static java.util.Arrays.asList;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.json.Json;
+import javax.json.stream.JsonGenerator;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -49,20 +53,40 @@ public class Get {
 
 			} else {
 				String idsUrl = (String) options.nonOptionArguments().get(0);
+
+				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+				JsonGenerator gen = Json.createGenerator(baos);
+				gen.writeStartObject().write("idsUrl", idsUrl);
+
+				if (!options.valuesOf(investigations).isEmpty()) {
+					gen.writeStartArray("investigationIds");
+					for (Long i : options.valuesOf(investigations)) {
+						gen.write(i);
+					}
+					gen.writeEnd();
+				}
+				if (!options.valuesOf(datasets).isEmpty()) {
+					gen.writeStartArray("datasetIds");
+					for (Long i : options.valuesOf(datasets)) {
+						gen.write(i);
+					}
+					gen.writeEnd();
+				}
+				if (!options.valuesOf(datafiles).isEmpty()) {
+					gen.writeStartArray("datafileIds");
+					for (Long i : options.valuesOf(datafiles)) {
+						gen.write(i);
+					}
+					gen.writeEnd();
+				}
+				gen.writeEnd().close();
+				System.out.println(baos.toString());
+
 				URI uri = new URIBuilder("http://localhost:8888").setPath("/getData").build();
 
 				List<NameValuePair> formparams = new ArrayList<>();
-				formparams.add(new BasicNameValuePair("idsUrl", idsUrl));
-				if (!options.valuesOf(investigations).isEmpty()) {
-					formparams.add(new BasicNameValuePair("investigationIds", listToString(options
-							.valuesOf(investigations))));
-				}
-				if (!options.valuesOf(datasets).isEmpty()) {
-					formparams.add(new BasicNameValuePair("datasetIds", listToString(options.valuesOf(datasets))));
-				}
-				if (!options.valuesOf(datafiles).isEmpty()) {
-					formparams.add(new BasicNameValuePair("datafileIds", listToString(options.valuesOf(datafiles))));
-				}
+				formparams.add(new BasicNameValuePair("json", baos.toString()));
+
 				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 					HttpEntity entity = new UrlEncodedFormEntity(formparams);
 					HttpPost httpPost = new HttpPost(uri);
@@ -73,17 +97,6 @@ public class Get {
 				}
 			}
 		}
-	}
-
-	private String listToString(List<Long> ids) {
-		StringBuilder sb = new StringBuilder();
-		for (long id : ids) {
-			if (sb.length() != 0) {
-				sb.append(',');
-			}
-			sb.append(Long.toString(id));
-		}
-		return sb.toString();
 	}
 
 }
