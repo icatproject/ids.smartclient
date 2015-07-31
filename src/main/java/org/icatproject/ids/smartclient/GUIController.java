@@ -1,9 +1,12 @@
 package org.icatproject.ids.smartclient;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
@@ -17,9 +20,14 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
-import javafx.scene.layout.GridPane;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -30,24 +38,34 @@ import javax.json.JsonArray;
 import javax.json.JsonException;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
+import javax.json.stream.JsonGenerator;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
 public class GUIController {
 	@FXML
 	private Text requests;
 
+	private final ToggleGroup group = new ToggleGroup();
+
 	@FXML
 	private Text dfids;
 
 	@FXML
 	private Text status;
+
+	@FXML
+	private Text result;
 
 	private boolean windows;
 
@@ -58,10 +76,26 @@ public class GUIController {
 	Button addServer;
 
 	@FXML
-	private GridPane table;
+	private VBox table;
+
+	@FXML
+	ChoiceBox<String> getType;
+
+	@FXML
+	TextField getWhat;
 
 	private void setStatus(String msg) {
 		status.setText(msg);
+	}
+
+	private void setBadResult(String msg) {
+		result.setText(msg);
+		result.setFill(Color.RED);
+	}
+
+	private void setGoodResult(String msg) {
+		result.setText(msg);
+		result.setFill(Color.GREEN);
 	}
 
 	private void setRequests(int num) {
@@ -94,8 +128,82 @@ public class GUIController {
 			stage.initModality(Modality.WINDOW_MODAL);
 			stage.initOwner(((Node) event.getSource()).getScene().getWindow());
 			stage.show();
+			setGoodResult("");
 		} catch (IOException e) {
-			setStatus(e.getClass() + " " + e.getMessage());
+			setBadResult(e.getClass() + " " + e.getMessage());
+		}
+	}
+
+	@FXML
+	private void removeServer(ActionEvent event) {
+		String idsUrl = (String) group.getSelectedToggle().getUserData();
+
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+		JsonGenerator gen = Json.createGenerator(baos);
+		gen.writeStartObject().write("idsUrl", idsUrl).writeEnd().close();
+
+		try {
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/logout").build();
+
+			List<NameValuePair> formparams = new ArrayList<>();
+			formparams.add(new BasicNameValuePair("json", baos.toString()));
+
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+				HttpEntity entity = new UrlEncodedFormEntity(formparams);
+				HttpPost httpPost = new HttpPost(uri);
+				httpPost.setEntity(entity);
+				try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
+					GUI.expectNothing(response);
+				}
+			}
+			setGoodResult("IDS Removed");
+		} catch (Exception e) {
+			setBadResult(e.getMessage());
+		}
+	}
+
+	@FXML
+	private void submitGet(ActionEvent event) {
+
+		try {
+			String idsUrl = (String) group.getSelectedToggle().getUserData();
+			String type = getType.getSelectionModel().selectedItemProperty().getValue();
+			long id = Long.parseLong(getWhat.getText());
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			JsonGenerator gen = Json.createGenerator(baos);
+			gen.writeStartObject().write("idsUrl", idsUrl);
+
+			if (type.equals("Investigation")) {
+				gen.writeStartArray("investigationIds");
+
+			} else if (type.equals("Dataset")) {
+				gen.writeStartArray("datasetIds");
+
+			} else if (type.equals("Datafile")) {
+				gen.writeStartArray("datafileIds");
+
+			}
+			gen.write(id).writeEnd().writeEnd().close();
+			System.out.println(baos.toString());
+
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/getData").build();
+
+			List<NameValuePair> formparams = new ArrayList<>();
+			formparams.add(new BasicNameValuePair("json", baos.toString()));
+
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+				HttpEntity entity = new UrlEncodedFormEntity(formparams);
+				HttpPost httpPost = new HttpPost(uri);
+				httpPost.setEntity(entity);
+				try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
+					Cli.expectNothing(response);
+				}
+			}
+			getWhat.clear();
+			setGoodResult("Submitted");
+		} catch (Exception e) {
+			setBadResult(e.getClass() + " " + e.getMessage());
 		}
 	}
 
@@ -157,18 +265,26 @@ public class GUIController {
 							setDfids(json.getJsonNumber("dfids").intValueExact());
 							JsonArray servers = json.getJsonArray("servers");
 							ObservableList<Node> children = table.getChildren();
-							children.remove(2, children.size());
+							children.clear();
+
 							for (int n = 0; n < servers.size(); n++) {
 								JsonObject server = servers.getJsonObject(n);
 								Hyperlink link = new Hyperlink(server.getString("idsUrl"));
 								link.setOnAction(new EventHandler<ActionEvent>() {
-								    @Override
-								    public void handle(ActionEvent e) {
-								        System.out.println("This link is clicked");
-								    }
+									@Override
+									public void handle(ActionEvent e) {
+										System.out.println("This link is clicked");
+									}
 								});
-								table.add(new Hyperlink(server.getString("idsUrl")), 0, n + 1);
-								table.add(new Text(server.getString("user", "Not logged in")), 1, n + 1);
+								String idsUrl = server.getString("idsUrl");
+								RadioButton rb = new RadioButton(idsUrl + " ("
+										+ server.getString("user", "Not logged in") + ")");
+								rb.setToggleGroup(group);
+								rb.setUserData(idsUrl);
+								table.getChildren().add(rb);
+								if (n == 0) {
+									rb.setSelected(true);
+								}
 							}
 							if (table.getScene() != null) {
 								table.getScene().getWindow().sizeToScene();

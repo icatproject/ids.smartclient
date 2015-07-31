@@ -7,6 +7,7 @@
 <?import javafx.scene.text.*?>
 <?import javafx.scene.control.cell.*?>
 <?import fxmltableview.*?>
+<?import javafx.collections.*?>
 
 <BorderPane fx:controller="org.icatproject.ids.smartclient.GUIController"
 	xmlns:fx="http://javafx.com/fxml">
@@ -37,17 +38,40 @@
 				<Text fx:id="dfids" GridPane.columnIndex="1" GridPane.rowIndex="2" />
 
 			</GridPane>
-			
-			<Button text="Add an IDS" onAction="#addServer"/>
 
-			<GridPane fx:id="table" hgap="10" vgap="5">
+			<Button text="Add an IDS" onAction="#addServer" />
+
+			<VBox fx:id="table" spacing="10">
 				<padding>
-					<Insets top="10" right="0" bottom="0" left="0" />
+					<Insets left="10.0" right="10.0" top="10.0" />
 				</padding>
-				<Label text="Server" GridPane.columnIndex="0"
-					GridPane.rowIndex="0" />
-				<Label text="User" GridPane.columnIndex="1" GridPane.rowIndex="0" />
-			</GridPane>
+			</VBox>
+
+			<Button text="Remove IDS" onAction="#removeServer" />
+			<HBox spacing="10">
+
+				<Label text="Get" />
+
+				<ChoiceBox fx:id="getType">
+					<items>
+						<FXCollections fx:factory="observableArrayList">
+							<String fx:value="Investigation" />
+							<String fx:value="Dataset" />
+							<String fx:value="Datafile" />
+						</FXCollections>
+					</items>
+					<value>
+						<String fx:value="Datafile" />
+					</value>
+				</ChoiceBox>
+				<TextField fx:id="getWhat" />
+				<Button text="Submit" onAction="#submitGet" />
+			</HBox>
+
+			<Text fx:id="result" />
+
+
+
 		</VBox>
 
 	</top>

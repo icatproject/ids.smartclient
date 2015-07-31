@@ -596,41 +596,21 @@ public class Server {
 	}
 
 	private static void processGetInvestigation(String[] cmd) throws Exception {
-		int offset = 0;
-
 		IdsClient idsClient = null;
 		try {
 			idsClient = new IdsClient(new URL(cmd[0]));
 		} catch (MalformedURLException e1) {
 			// Can't happen
 		}
-		String sessionId;
+		String sessionId = getSessionId(cmd[0]);
 
-		sessionId = getSessionId(cmd[0]);
-		String icatUrl = idsClient.getIcatUrl().toString();
-		ICAT icatClient = new ICAT(icatUrl);
-		Session session = icatClient.getSession(sessionId);
-		while (true) {
-			String query = "SELECT df.id FROM Datafile df WHERE df.dataset.investigation.id = " + cmd[3]
-					+ " ORDER BY df.id LIMIT " + offset + ", 1000";
-			String jsonString = session.search(query);
-			try (JsonReader parser = Json.createReader(new ByteArrayInputStream(jsonString.getBytes()))) {
-				JsonArray dfids = parser.readArray();
-				for (JsonValue v : dfids) {
-					addRequest(cmd[0] + " GET Datafile " + v);
-				}
-				if (dfids.size() < 1000) {
-					break;
-				}
-
-				offset += 1000;
-			}
+		for (Long invid : idsClient.getDatafileIds(sessionId,
+				new DataSelection().addInvestigation(Long.parseLong(cmd[3])))) {
+			addRequest(cmd[0] + " GET Datafile " + Long.toString(invid));
 		}
-
 	}
 
 	private static void processGetDataset(String[] cmd) throws Exception {
-		int offset = 0;
 
 		IdsClient idsClient = null;
 		try {
@@ -641,26 +621,10 @@ public class Server {
 		String sessionId;
 
 		sessionId = getSessionId(cmd[0]);
-		String icatUrl = idsClient.getIcatUrl().toString();
-		ICAT icatClient = new ICAT(icatUrl);
-		Session session = icatClient.getSession(sessionId);
-		while (true) {
-			String query = "SELECT df.id FROM Datafile df WHERE df.dataset.id = " + cmd[3] + " ORDER BY df.id LIMIT "
-					+ offset + ", 1000";
-			String jsonString = session.search(query);
-			try (JsonReader parser = Json.createReader(new ByteArrayInputStream(jsonString.getBytes()))) {
-				JsonArray dfids = parser.readArray();
-				for (JsonValue v : dfids) {
-					addRequest(cmd[0] + " GET Datafile " + v);
-				}
-				if (dfids.size() < 1000) {
-					break;
-				}
 
-				offset += 1000;
-			}
+		for (Long invid : idsClient.getDatafileIds(sessionId, new DataSelection().addDataset(Long.parseLong(cmd[3])))) {
+			addRequest(cmd[0] + " GET Datafile " + Long.toString(invid));
 		}
-
 	}
 
 	private static void addRequest(String request) throws FileNotFoundException {
