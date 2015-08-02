@@ -46,6 +46,7 @@ import javax.json.stream.JsonGenerator;
 
 import org.icatproject.icat.client.ICAT;
 import org.icatproject.icat.client.IcatException;
+import org.icatproject.icat.client.IcatException.IcatExceptionType;
 import org.icatproject.icat.client.Session;
 import org.icatproject.ids.client.BadRequestException;
 import org.icatproject.ids.client.DataNotOnlineException;
@@ -185,7 +186,6 @@ public class Server {
 		httpServer.createContext("/status", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
-				logger.debug("Status request received");
 				if (!httpExchange.getRequestMethod().equals("GET")) {
 					report(httpExchange, 404, "BadRequestException", "GET expected");
 				} else {
@@ -448,11 +448,14 @@ public class Server {
 									processGetDatafile(cmd);
 								}
 							}
-							Files.delete(file.toPath());
 						} catch (Exception e) {
 							logger.warn(e.getClass() + " " + e.getMessage());
 						}
-
+						try {
+							Files.delete(file.toPath());
+						} catch (IOException e) {
+							logger.warn(e.getClass() + " " + e.getMessage());
+						}
 					}
 					try {
 						Thread.sleep(5000);
@@ -495,7 +498,19 @@ public class Server {
 			ICAT icatClient = new ICAT(icatUrl);
 			Session session = icatClient.getSession(sessionId);
 			long dfId = Long.parseLong(file.getName());
-			String jsonString = session.get("Datafile", dfId);
+			String jsonString;
+			try {
+				jsonString = session.get("Datafile", dfId);
+			} catch (IcatException e) {
+				IcatExceptionType type = e.getType();
+				if (type == IcatExceptionType.NO_SUCH_OBJECT_FOUND) {
+					logger.debug("File " + dfId + " does not exist so stop looking for it");
+					Files.delete(file.toPath());
+				} else {
+					logger.debug("Get of file " + dfId + " reports " + type + " " + e.getMessage());
+				}
+				return null;
+			}
 
 			String location;
 			long fileSize;
