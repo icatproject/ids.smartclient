@@ -23,7 +23,11 @@
 					GridPane.rowIndex="0" />
 
 				<TextField fx:id="idsUrl" GridPane.columnIndex="1"
-					GridPane.rowIndex="0" />
+					GridPane.rowIndex="0">
+					<tooltip>
+						<Tooltip text="URL must include the scheme (e.g. https)" />
+					</tooltip>
+				</TextField>
 
 				<Label text="Authentication method:" GridPane.columnIndex="0"
 					GridPane.rowIndex="1" />

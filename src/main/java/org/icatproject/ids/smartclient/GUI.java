@@ -30,10 +30,8 @@ public class GUI extends Application {
 			URL uri = getClass().getResource("gui.fxml");
 			Parent p = FXMLLoader.load(uri);
 			Scene scene = new Scene(p);
-			scene.getStylesheets().add(getClass().getResource("gui.css").toExternalForm());
 			primaryStage.setScene(scene);
 			primaryStage.setTitle("Smartclient");
-			// ScenicView.show(scene);
 			primaryStage.show();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -44,7 +42,7 @@ public class GUI extends Application {
 	public static void main(String[] args) {
 		launch(args);
 	}
-	
+
 	static void expectNothing(CloseableHttpResponse response) throws IOException {
 		checkStatus(response);
 		HttpEntity entity = response.getEntity();
@@ -54,7 +52,7 @@ public class GUI extends Application {
 			}
 		}
 	}
-	
+
 	static void checkStatus(HttpResponse response) throws IOException {
 		StatusLine status = response.getStatusLine();
 		if (status == null) {

@@ -60,7 +60,6 @@ public class AddServerController {
 		}
 
 		gen.writeEnd().close();
-		System.out.println(baos.toString());
 
 		List<NameValuePair> formparams = new ArrayList<>();
 		formparams.add(new BasicNameValuePair("json", baos.toString()));
