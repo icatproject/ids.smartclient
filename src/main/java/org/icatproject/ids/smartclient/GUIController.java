@@ -197,7 +197,7 @@ public class GUIController {
 				HttpPost httpPost = new HttpPost(uri);
 				httpPost.setEntity(entity);
 				try (CloseableHttpResponse response = httpclient.execute(httpPost)) {
-					Cli.expectNothing(response);
+					GUI.expectNothing(response);
 				}
 			}
 			getWhat.clear();
