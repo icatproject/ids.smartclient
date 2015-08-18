@@ -88,7 +88,7 @@ public class Cli {
 	}
 
 	private static void printHelp() {
-		System.out.println("First parameter must be one of help, login, status or put");
+		System.out.println("First parameter must be one of help, login, logout, get or ready");
 	}
 
 	static void checkStatus(HttpResponse response) throws IOException {

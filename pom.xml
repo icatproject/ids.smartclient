@@ -58,6 +58,9 @@
 
 	<dependencies>
 
+		<!-- All dependencies changed here must also be changed in the build.xml 
+			file to match. -->
+
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
