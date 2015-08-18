@@ -37,6 +37,8 @@ public class Get {
 				.describedAs("Dataset id");
 		OptionSpec<Long> datafiles = parser.acceptsAll(asList("datafile", "f")).withRequiredArg().ofType(Long.class)
 				.describedAs("Datafile id");
+		OptionSpec<String> preparedIds = parser.acceptsAll(asList("prepared", "p")).withRequiredArg().ofType(String.class)
+				.describedAs("Prepared id");
 
 		parser.acceptsAll(asList("h", "?", "help"), "show help").forHelp();
 
@@ -75,6 +77,13 @@ public class Get {
 				if (!options.valuesOf(datafiles).isEmpty()) {
 					gen.writeStartArray("datafileIds");
 					for (Long i : options.valuesOf(datafiles)) {
+						gen.write(i);
+					}
+					gen.writeEnd();
+				}
+				if (!options.valuesOf(preparedIds).isEmpty()) {
+					gen.writeStartArray("preparedIds");
+					for (String i : options.valuesOf(preparedIds)) {
 						gen.write(i);
 					}
 					gen.writeEnd();

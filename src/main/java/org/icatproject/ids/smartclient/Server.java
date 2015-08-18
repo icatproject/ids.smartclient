@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -23,8 +24,11 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -94,6 +98,41 @@ public class Server {
 		}
 
 	}
+
+	private final static int checkNum = 500;
+	private final static double goodFraction = 0.3;
+	private final static int refreshIntervalSeconds = 60;
+
+	private class PidStatus {
+
+		private List<Long> toGet;
+		private int size;
+		private String pid;
+		private IdsClient idsClient;
+
+		private String idsUrl;
+
+		public PidStatus(String idsUrl, String pid) throws InternalException, BadRequestException, NotFoundException,
+				NotImplementedException, IOException {
+			idsClient = new IdsClient(new URL(idsUrl));
+			this.idsUrl = idsUrl;
+
+			this.pid = pid;
+			toGet = idsClient.getDatafileIds(pid);
+			size = toGet.size();
+			Collections.shuffle(toGet);
+			logger.debug("Pidstatus " + pid + " created with " + size + " to get");
+		}
+
+		public void report(JsonGenerator gen) {
+			synchronized (this) {
+				gen.writeStartObject().write("pid", pid).write("size", size).write("toGet", toGet.size()).writeEnd();
+			}
+		}
+
+	}
+
+	private Map<String, PidStatus> pidStatuses = new HashMap<>();
 
 	private static Path dot;
 	private static Path top;
@@ -169,6 +208,14 @@ public class Server {
 								data.addDatafile(num);
 							}
 						}
+
+						list = json.getJsonArray("preparedIds");
+						if (list != null) {
+							for (JsonValue jv : list) {
+								String pid = ((JsonString) jv).getString();
+								addRequest(idsUrl + " GET PreparedId " + pid);
+							}
+						}
 					} catch (Exception e) {
 						report(httpExchange, 500, "UnexpectedException", e.getMessage());
 						return;
@@ -179,6 +226,55 @@ public class Server {
 					httpExchange.close();
 				}
 
+			}
+
+		});
+
+		httpServer.createContext("/isReady", new HttpHandler() {
+
+			public void handle(HttpExchange httpExchange) throws IOException {
+				logger.debug("isReady request received");
+				if (!httpExchange.getRequestMethod().equals("GET")) {
+					report(httpExchange, 404, "BadRequestException", "GET expected");
+				} else {
+					String line = httpExchange.getRequestURI().getQuery();
+					int idx = line.indexOf("=");
+					logger.debug("Query is " + line);
+					try (JsonReader reader = Json.createReader(new StringReader(line.substring(idx + 1)))) {
+						JsonObject json = reader.readObject();
+						String idsUrl = json.getString("idsUrl");
+						JsonArray list = json.getJsonArray("preparedIds");
+
+						ByteArrayOutputStream baos = new ByteArrayOutputStream();
+						JsonGenerator gen = Json.createGenerator(baos);
+						gen.writeStartArray();
+
+						if (list != null) {
+							for (JsonValue jv : list) {
+								String pid = ((JsonString) jv).getString();
+								PidStatus pidStatus;
+								synchronized (pidStatuses) {
+									if (pidStatuses.containsKey(pid)) {
+										pidStatus = pidStatuses.get(pid);
+									} else {
+										pidStatus = new PidStatus(idsUrl, pid);
+										pidStatuses.put(pid, pidStatus);
+									}
+								}
+								pidStatus.report(gen);
+							}
+						}
+						gen.writeEnd();
+						gen.close();
+						byte[] out = baos.toString().getBytes("UTF-8");
+						corsify(httpExchange, 200, out.length);
+						httpExchange.getResponseBody().write(out);
+						httpExchange.close();
+					} catch (Exception e) {
+						report(httpExchange, 500, "UnexpectedException", e.getMessage());
+						return;
+					}
+				}
 			}
 
 		});
@@ -415,8 +511,79 @@ public class Server {
 								+ e.getMessage());
 					}
 				}
+
+				Map<String, PidStatus> pidStatusesClone = new HashMap<>();
+				synchronized (pidStatuses) {
+					pidStatusesClone = new HashMap<>(pidStatuses);
+				}
+				for (Entry<String, PidStatus> entry : pidStatusesClone.entrySet()) {
+					PidStatus pidStatus = entry.getValue();
+					synchronized (pidStatus) {
+						IdsClient idsClient = pidStatus.idsClient;
+						String icatUrl;
+						Session session = null;
+						try {
+							icatUrl = idsClient.getIcatUrl().toString();
+							ICAT icatClient = new ICAT(icatUrl);
+							session = icatClient.getSession(getSessionId(pidStatus.idsUrl));
+
+							for (;;) {
+								StringBuilder sb = new StringBuilder("SELECT df FROM Datafile df WHERE df.id IN (");
+								boolean first = true;
+								for (int n = pidStatus.toGet.size() - 1, m = 0; n >= 0 && m < checkNum; n--, m++) {
+									Long pid = pidStatus.toGet.get(n);
+
+									if (!Files.exists(dot.resolve("dfids").resolve(pid.toString()))) {
+										if (!first) {
+											sb.append(',');
+										} else {
+											first = false;
+										}
+										sb.append(pid);
+									}
+
+								}
+								sb.append(')');
+								if (first) {
+									logger.debug("Prepared id " + pidStatus.pid + " is ready");
+									break;
+								}
+
+								Set<Long> ready = new HashSet<>();
+								try (JsonReader reader = Json.createReader(new StringReader(session.search(sb
+										.toString())))) {
+									for (JsonValue v : reader.readArray()) {
+										JsonObject obj = ((JsonObject) v).getJsonObject("Datafile");
+										long id = obj.getJsonNumber("id").longValueExact();
+										String location = obj.getString("location");
+										logger.debug(id + " : " + location);
+										Path target = top.resolve(getServerFileName(pidStatus.idsUrl))
+												.resolve(location);
+										if (Files.exists(target)) {
+											ready.add(id);
+										}
+									}
+								}
+								logger.debug("There are " + ready.size() + " files now become ready");
+								for (int n = pidStatus.toGet.size() - 1, m = 0; n >= 0 && m < checkNum; n--, m++) {
+									if (ready.contains(pidStatus.toGet.get(n))) {
+										pidStatus.toGet.remove(n);
+									}
+								}
+								if (ready.size() < goodFraction * checkNum) {
+									break;
+								}
+
+							}
+
+						} catch (Exception e) {
+							logger.warn("RefreshTask " + e.getClass() + " for preparedId " + pidStatus.pid
+									+ " reports " + e.getMessage());
+						}
+					}
+				}
 				try {
-					Thread.sleep(300 * 1000); // Five minutes
+					Thread.sleep(refreshIntervalSeconds * 1000);
 				} catch (InterruptedException e) {
 					return;
 				}
@@ -446,6 +613,8 @@ public class Server {
 									processGetDataset(cmd);
 								} else if (cmd[2].equals("Datafile")) {
 									processGetDatafile(cmd);
+								} else if (cmd[2].equals("PreparedId")) {
+									processGetPreparedId(cmd);
 								}
 							}
 						} catch (Exception e) {
@@ -466,6 +635,7 @@ public class Server {
 			}
 
 		}
+
 	}
 
 	private static void processGetDatafile(String[] cmd) throws Exception {
@@ -626,7 +796,6 @@ public class Server {
 	}
 
 	private static void processGetDataset(String[] cmd) throws Exception {
-
 		IdsClient idsClient = null;
 		try {
 			idsClient = new IdsClient(new URL(cmd[0]));
@@ -638,6 +807,18 @@ public class Server {
 		sessionId = getSessionId(cmd[0]);
 
 		for (Long invid : idsClient.getDatafileIds(sessionId, new DataSelection().addDataset(Long.parseLong(cmd[3])))) {
+			addRequest(cmd[0] + " GET Datafile " + Long.toString(invid));
+		}
+	}
+
+	private void processGetPreparedId(String[] cmd) throws Exception {
+		IdsClient idsClient = null;
+		try {
+			idsClient = new IdsClient(new URL(cmd[0]));
+		} catch (MalformedURLException e1) {
+			// Can't happen
+		}
+		for (Long invid : idsClient.getDatafileIds(cmd[3])) {
 			addRequest(cmd[0] + " GET Datafile " + Long.toString(invid));
 		}
 	}

@@ -19,7 +19,9 @@ import org.icatproject.icat.client.ICAT;
 import org.icatproject.icat.client.Session;
 import org.icatproject.icat.client.Session.Attributes;
 import org.icatproject.icat.client.Session.DuplicateAction;
+import org.icatproject.ids.client.DataSelection;
 import org.icatproject.ids.client.IdsClient;
+import org.icatproject.ids.client.IdsClient.Flag;
 
 public class TestSetup {
 
@@ -69,6 +71,9 @@ public class TestSetup {
 						+ " is a rather splendid datafile");
 			}
 		}
+
+		System.out.println("PreparedId "
+				+ idsClient.prepareData(session.getId(), new DataSelection().addDatasets(dsids), Flag.NONE));
 		System.out.println("Done");
 
 	}

@@ -64,6 +64,8 @@ public class Cli {
 					new Logout(rest);
 				} else if (cmd.equals("get")) {
 					new Get(rest);
+				} else if (cmd.equals("ready")) {
+					new Ready(rest);
 				} else if (cmd.equals("status")) {
 					new Status(rest);
 				} else if (cmd.equals("help")) {

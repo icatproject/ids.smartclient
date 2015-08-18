@@ -5,6 +5,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.rules.ExpectedException.none;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -40,4 +42,17 @@ public class TestCli {
 
 		parser.printHelpOn(System.out);
 	}
+	
+	@Test
+	public void time() {
+		List<Long> l = new ArrayList<>();
+		l.add(4L);
+		l.add(5L);
+		l.add(6L);
+		l.add(7L);
+		for (int n = l.size()-1; n >= 0; n--) {
+			System.out.println(n + " " + l.get(n));
+		}
+	}
+
 }
