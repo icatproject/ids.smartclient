@@ -6,6 +6,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 
 import javax.json.Json;
 import javax.json.stream.JsonGenerator;
@@ -19,12 +23,12 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 public class Ready {
 
-	public Ready(String[] rest) throws IOException, URISyntaxException {
+	public Ready(String[] rest) throws IOException, URISyntaxException, KeyManagementException, KeyStoreException,
+			NoSuchAlgorithmException, CertificateException {
 		OptionParser parser = new OptionParser();
 
 		OptionSpec<String> preparedIds = parser.acceptsAll(asList("prepared", "p")).withRequiredArg()
@@ -58,12 +62,10 @@ public class Ready {
 					gen.writeEnd();
 				}
 				gen.writeEnd().close();
-				System.out.println(baos.toString());
 
-				URI uri = new URIBuilder("http://localhost:8888").setPath("/isReady")
+				URI uri = new URIBuilder("https://localhost:8888").setPath("/isReady")
 						.addParameter("json", baos.toString()).build();
-				System.out.println(uri);
-				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+				try (CloseableHttpClient httpclient = Cli.getHttpsClient()) {
 					HttpGet httpGet = new HttpGet(uri);
 					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 						Cli.checkStatus(response);

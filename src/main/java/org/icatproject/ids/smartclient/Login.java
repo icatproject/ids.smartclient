@@ -6,6 +6,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,19 +27,19 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 
 public class Login {
 
-	public Login(String[] rest) throws IOException, URISyntaxException {
+	public Login(String[] rest) throws IOException, URISyntaxException, KeyManagementException, KeyStoreException,
+			NoSuchAlgorithmException, CertificateException {
 		OptionParser parser = new OptionParser();
 
-		OptionSpec<String> plugin = parser.acceptsAll(asList("plugin", "p")).withRequiredArg().ofType(String.class)
-				.describedAs("plugin");
+		OptionSpec<String> plugin = parser.acceptsAll(asList("plugin", "p"), "name of authentication plugin")
+				.withRequiredArg().ofType(String.class).describedAs("plugin");
 
-		OptionSpec<String> sessionId = parser.acceptsAll(asList("sid", "s")).withRequiredArg().ofType(String.class)
-				.describedAs("sessionId");
+		OptionSpec<String> sessionId = parser.acceptsAll(asList("sid", "s"), "sessionId instead of plugin")
+				.withRequiredArg().ofType(String.class).describedAs("sessionId");
 
 		parser.acceptsAll(asList("h", "?", "help"), "show help").forHelp();
 
@@ -86,12 +90,12 @@ public class Login {
 			gen.writeEnd().close();
 			System.out.println(baos.toString());
 
-			URI uri = new URIBuilder("http://localhost:8888").setPath("/login").build();
+			URI uri = new URIBuilder("https://localhost:8888").setPath("/login").build();
 
 			List<NameValuePair> formparams = new ArrayList<>();
 			formparams.add(new BasicNameValuePair("json", baos.toString()));
 
-			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+			try (CloseableHttpClient httpclient = Cli.getHttpsClient()) {
 				HttpEntity entity = new UrlEncodedFormEntity(formparams);
 				HttpPost httpPost = new HttpPost(uri);
 				httpPost.setEntity(entity);

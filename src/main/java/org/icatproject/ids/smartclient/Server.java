@@ -4,7 +4,9 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,6 +26,14 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,6 +57,11 @@ import javax.json.JsonReader;
 import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.stream.JsonGenerator;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.TrustManagerFactory;
 
 import org.icatproject.icat.client.ICAT;
 import org.icatproject.icat.client.IcatException;
@@ -65,10 +80,15 @@ import org.icatproject.ids.client.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import sun.security.tools.keytool.CertAndKeyGen;
+import sun.security.x509.X500Name;
+
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsParameters;
+import com.sun.net.httpserver.HttpsServer;
 
 @SuppressWarnings("restriction")
 // Keeps eclipse happy
@@ -99,7 +119,7 @@ public class Server {
 
 	}
 
-	private final static int checkNum = 500;
+	private final static int checkNum = 100;
 	private final static double goodFraction = 0.3;
 	private final static int refreshIntervalSeconds = 60;
 
@@ -147,14 +167,91 @@ public class Server {
 	public Server() throws IOException {
 		logger.info("Personal server starting");
 
+		Path home = Paths.get(System.getProperty("user.home"));
+		dot = home.resolve(".smartclient");
+
+		Path store = dot.resolve("local.jks");
+
+		String alias = "localhost";
+		char[] password = "password".toCharArray();
+
+		if (!Files.exists(store)) {
+			try {
+				CertAndKeyGen keyGen = new CertAndKeyGen("RSA", "SHA1WithRSA", null);
+				keyGen.generate(1024);
+				PrivateKey key = keyGen.getPrivateKey();
+
+				// Generate self signed certificate
+				X509Certificate[] chain = new X509Certificate[1];
+				chain[0] = keyGen.getSelfCertificate(new X500Name("CN=LOCALHOST"), (long) 365 * 24 * 3600);
+
+				logger.debug("Certificate : " + chain[0].toString());
+
+				KeyStore keyStore = KeyStore.getInstance("jks");
+				keyStore.load(null, null);
+
+				keyStore.setKeyEntry(alias, key, password, chain);
+				keyStore.store(new FileOutputStream(store.toString()), password);
+
+			} catch (Exception e) {
+				logger.error("Failed to start " + e.getClass() + e.getMessage());
+				return;
+			}
+		}
+
 		int port = 8888;
-		HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
+
+		HttpsServer httpServer = HttpsServer.create(new InetSocketAddress(port), 0);
+		SSLContext sslContext;
+		try {
+			sslContext = SSLContext.getInstance("TLS");
+			KeyStore ks = KeyStore.getInstance("JKS");
+			ks.load(new FileInputStream(store.toString()), password);
+			// setup the key manager factory
+			KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+			kmf.init(ks, password);
+
+			// setup the trust manager factory
+			TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
+			tmf.init(ks);
+
+			sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+
+		} catch (NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException
+				| KeyManagementException e) {
+			logger.error("Failed to start " + e.getClass() + e.getMessage());
+			return;
+		}
+
+		httpServer.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
+			public void configure(HttpsParameters params) {
+				try {
+					SSLContext c = SSLContext.getDefault();
+					SSLEngine engine = c.createSSLEngine();
+					params.setNeedClientAuth(false);
+					params.setCipherSuites(engine.getEnabledCipherSuites());
+					params.setProtocols(engine.getEnabledProtocols());
+
+					// get the default parameters
+					SSLParameters sslparams = c.getDefaultSSLParameters();
+
+					params.setSSLParameters(sslparams);
+				} catch (NoSuchAlgorithmException e) {
+					logger.error("Failed to start " + e.getClass() + e.getMessage());
+					return;
+				}
+			}
+		});
+
 		httpServer.setExecutor(Executors.newCachedThreadPool());
 
 		httpServer.createContext("/getData", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
-				if (!httpExchange.getRequestMethod().equals("POST")) {
+				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
+					corsify(httpExchange, 200, 0);
+					httpExchange.close();
+				} else if (!httpExchange.getRequestMethod().equals("POST")) {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
 					byte[] jsonBytes;
@@ -233,10 +330,10 @@ public class Server {
 		httpServer.createContext("/isReady", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
-				logger.debug("isReady request received");
 				if (!httpExchange.getRequestMethod().equals("GET")) {
 					report(httpExchange, 404, "BadRequestException", "GET expected");
 				} else {
+					logger.debug("isReady request received");
 					String line = httpExchange.getRequestURI().getQuery();
 					int idx = line.indexOf("=");
 					logger.debug("Query is " + line);
@@ -285,7 +382,6 @@ public class Server {
 				if (!httpExchange.getRequestMethod().equals("GET")) {
 					report(httpExchange, 404, "BadRequestException", "GET expected");
 				} else {
-
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 					JsonGenerator gen = Json.createGenerator(baos);
 					try {
@@ -328,7 +424,6 @@ public class Server {
 		});
 
 		httpServer.createContext("/ping", new HttpHandler() {
-
 			public void handle(HttpExchange httpExchange) {
 				if (!httpExchange.getRequestMethod().equals("GET")) {
 					report(httpExchange, 404, "BadRequestException", "GET expected");
@@ -346,10 +441,13 @@ public class Server {
 		httpServer.createContext("/login", new HttpHandler() {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
-				logger.debug("Login request received");
-				if (!httpExchange.getRequestMethod().equals("POST")) {
+				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
+					corsify(httpExchange, 200, 0);
+					httpExchange.close();
+				} else if (!httpExchange.getRequestMethod().equals("POST")) {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
+					logger.debug("Login request received");
 					byte[] jsonBytes;
 					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
 						String line = in.readLine();
@@ -403,9 +501,11 @@ public class Server {
 		});
 
 		httpServer.createContext("/logout", new HttpHandler() {
-
 			public void handle(HttpExchange httpExchange) throws IOException {
-				if (!httpExchange.getRequestMethod().equals("POST")) {
+				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
+					corsify(httpExchange, 200, 0);
+					httpExchange.close();
+				} else if (!httpExchange.getRequestMethod().equals("POST")) {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
 					byte[] jsonBytes;
@@ -447,9 +547,6 @@ public class Server {
 		});
 
 		singleThreadPool = Executors.newSingleThreadExecutor();
-
-		Path home = Paths.get(System.getProperty("user.home"));
-		dot = home.resolve(".smartclient");
 
 		try {
 			FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(PosixFilePermissions
@@ -556,7 +653,10 @@ public class Server {
 										JsonObject obj = ((JsonObject) v).getJsonObject("Datafile");
 										long id = obj.getJsonNumber("id").longValueExact();
 										String location = obj.getString("location");
-										logger.debug(id + " : " + location);
+
+										if (location.startsWith("/")) {
+											location = location.substring(1);
+										}
 										Path target = top.resolve(getServerFileName(pidStatus.idsUrl))
 												.resolve(location);
 										if (Files.exists(target)) {
@@ -571,6 +671,7 @@ public class Server {
 									}
 								}
 								if (ready.size() < goodFraction * checkNum) {
+									logger.debug("Not enough files ready to bother trying again");
 									break;
 								}
 

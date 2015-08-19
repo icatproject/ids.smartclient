@@ -1,17 +1,23 @@
 package org.icatproject.ids.smartclient;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.Arrays;
 
 import javax.json.Json;
 import javax.json.JsonException;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
-
-import joptsimple.OptionException;
+import javax.net.ssl.SSLContext;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -20,6 +26,8 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLContexts;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
@@ -31,14 +39,14 @@ public class Cli {
 		try {
 
 			try {
-				URI uri = new URIBuilder("http://localhost:8888").setPath("/ping").build();
-				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+				URI uri = new URIBuilder("https://localhost:8888").setPath("/ping").build();
+				try (CloseableHttpClient httpclient = getHttpsClient()) {
 					HttpGet httpGet = new HttpGet(uri);
 					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 						Cli.expectNothing(response);
 					}
 				}
-			} catch (IOException e) {
+			} catch (Exception e) {
 
 				ProcessBuilder pb = new ProcessBuilder("sh", "/opt/smartclient/app/server.sh");
 				Process p = pb.start();
@@ -46,6 +54,7 @@ public class Cli {
 
 				int exitValue = p.exitValue();
 				if (exitValue != 0) {
+					System.err.println("Ping produces " + e.getClass() + " " + e.getMessage());
 					System.err.println("Unable to start server please take a look at ~/.smartclient/log");
 					System.exit(1);
 				}
@@ -75,16 +84,23 @@ public class Cli {
 					System.exit(1);
 				}
 			}
-		} catch (IOException e) {
+		} catch (Exception e) {
 			System.out.println(e.getMessage());
-
-		} catch (OptionException e) {
-			System.out.println(e.getMessage());
-
-		} catch (URISyntaxException e) {
-			System.out.println(e.getMessage());
-
 		}
+	}
+
+	static CloseableHttpClient getHttpsClient() throws KeyManagementException, KeyStoreException,
+			NoSuchAlgorithmException, CertificateException, IOException {
+		Path home = Paths.get(System.getProperty("user.home"));
+		Path store = home.resolve(".smartclient").resolve("local.jks");
+		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		try (FileInputStream instream = new FileInputStream(store.toFile())) {
+			trustStore.load(instream, "password".toCharArray());
+		}
+		SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(trustStore).build();
+		SSLConnectionSocketFactory factory = new SSLConnectionSocketFactory(sslcontext,
+				SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+		return HttpClients.custom().setSSLSocketFactory(factory).build();
 	}
 
 	private static void printHelp() {

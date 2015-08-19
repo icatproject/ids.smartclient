@@ -1,19 +1,32 @@
 package org.icatproject.ids.smartclient;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 
 import javax.json.Json;
 import javax.json.JsonException;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
+import javax.net.ssl.SSLContext;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.ParseException;
 import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLContexts;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 import javafx.application.Application;
@@ -86,4 +99,19 @@ public class GUI extends Application {
 	static void abort(String msg) throws IOException {
 		throw new IOException(msg);
 	}
+
+	static CloseableHttpClient getHttpsClient() throws KeyManagementException, KeyStoreException,
+			NoSuchAlgorithmException, CertificateException, IOException {
+		Path home = Paths.get(System.getProperty("user.home"));
+		Path store = home.resolve(".smartclient").resolve("local.jks");
+		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		try (FileInputStream instream = new FileInputStream(store.toFile())) {
+			trustStore.load(instream, "password".toCharArray());
+		}
+		SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(trustStore).build();
+		SSLConnectionSocketFactory factory = new SSLConnectionSocketFactory(sslcontext,
+				SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+		return HttpClients.custom().setSSLSocketFactory(factory).build();
+	}
+
 }
