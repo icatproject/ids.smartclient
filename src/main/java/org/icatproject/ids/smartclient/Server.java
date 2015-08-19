@@ -141,7 +141,7 @@ public class Server {
 			toGet = idsClient.getDatafileIds(pid);
 			size = toGet.size();
 			Collections.shuffle(toGet);
-			logger.debug("Pidstatus " + pid + " created with " + size + " to get");
+			logger.debug("Pidstatus " + pid + " created with " + size + " to download.");
 		}
 
 		public void report(JsonGenerator gen) {
@@ -615,73 +615,72 @@ public class Server {
 				}
 				for (Entry<String, PidStatus> entry : pidStatusesClone.entrySet()) {
 					PidStatus pidStatus = entry.getValue();
-					synchronized (pidStatus) {
-						IdsClient idsClient = pidStatus.idsClient;
-						String icatUrl;
-						Session session = null;
-						try {
-							icatUrl = idsClient.getIcatUrl().toString();
-							ICAT icatClient = new ICAT(icatUrl);
-							session = icatClient.getSession(getSessionId(pidStatus.idsUrl));
+					IdsClient idsClient = pidStatus.idsClient;
+					String icatUrl;
+					Session session = null;
+					try {
+						icatUrl = idsClient.getIcatUrl().toString();
+						ICAT icatClient = new ICAT(icatUrl);
+						session = icatClient.getSession(getSessionId(pidStatus.idsUrl));
 
-							for (;;) {
-								StringBuilder sb = new StringBuilder("SELECT df FROM Datafile df WHERE df.id IN (");
-								boolean first = true;
-								for (int n = pidStatus.toGet.size() - 1, m = 0; n >= 0 && m < checkNum; n--, m++) {
-									Long pid = pidStatus.toGet.get(n);
+						for (;;) {
+							StringBuilder sb = new StringBuilder("SELECT df FROM Datafile df WHERE df.id IN (");
+							boolean first = true;
+							for (int n = pidStatus.toGet.size() - 1, m = 0; n >= 0 && m < checkNum; n--, m++) {
+								Long pid = pidStatus.toGet.get(n);
 
-									if (!Files.exists(dot.resolve("dfids").resolve(pid.toString()))) {
-										if (!first) {
-											sb.append(',');
-										} else {
-											first = false;
-										}
-										sb.append(pid);
+								if (!Files.exists(dot.resolve("dfids").resolve(pid.toString()))) {
+									if (!first) {
+										sb.append(',');
+									} else {
+										first = false;
 									}
-
-								}
-								sb.append(')');
-								if (first) {
-									logger.debug("Prepared id " + pidStatus.pid + " is ready");
-									break;
+									sb.append(pid);
 								}
 
-								Set<Long> ready = new HashSet<>();
-								try (JsonReader reader = Json.createReader(new StringReader(session.search(sb
-										.toString())))) {
-									for (JsonValue v : reader.readArray()) {
-										JsonObject obj = ((JsonObject) v).getJsonObject("Datafile");
-										long id = obj.getJsonNumber("id").longValueExact();
-										String location = obj.getString("location");
+							}
+							sb.append(')');
+							if (first) {
+								logger.debug("Prepared id " + pidStatus.pid + " is ready");
+								break;
+							}
 
-										if (location.startsWith("/")) {
-											location = location.substring(1);
-										}
-										Path target = top.resolve(getServerFileName(pidStatus.idsUrl))
-												.resolve(location);
-										if (Files.exists(target)) {
-											ready.add(id);
-										}
+							Set<Long> ready = new HashSet<>();
+							try (JsonReader reader = Json.createReader(new StringReader(session.search(sb.toString())))) {
+								for (JsonValue v : reader.readArray()) {
+									JsonObject obj = ((JsonObject) v).getJsonObject("Datafile");
+									long id = obj.getJsonNumber("id").longValueExact();
+									String location = obj.getString("location");
+
+									if (location.startsWith("/")) {
+										location = location.substring(1);
+									}
+									Path target = top.resolve(getServerFileName(pidStatus.idsUrl)).resolve(location);
+									if (Files.exists(target)) {
+										ready.add(id);
 									}
 								}
-								logger.debug("There are " + ready.size() + " files now become ready");
+							}
+							logger.debug("There are " + ready.size() + " files now become ready");
+							synchronized (pidStatus) {
 								for (int n = pidStatus.toGet.size() - 1, m = 0; n >= 0 && m < checkNum; n--, m++) {
 									if (ready.contains(pidStatus.toGet.get(n))) {
 										pidStatus.toGet.remove(n);
 									}
 								}
-								if (ready.size() < goodFraction * checkNum) {
-									logger.debug("Not enough files ready to bother trying again");
-									break;
-								}
-
+							}
+							if (ready.size() < goodFraction * checkNum) {
+								logger.debug("Not enough files ready to bother trying again");
+								break;
 							}
 
-						} catch (Exception e) {
-							logger.warn("RefreshTask " + e.getClass() + " for preparedId " + pidStatus.pid
-									+ " reports " + e.getMessage());
 						}
+
+					} catch (Exception e) {
+						logger.warn("RefreshTask " + e.getClass() + " for preparedId " + pidStatus.pid + " reports "
+								+ e.getMessage());
 					}
+
 				}
 				try {
 					Thread.sleep(refreshIntervalSeconds * 1000);
