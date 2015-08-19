@@ -119,7 +119,7 @@ public class Server {
 
 	}
 
-	private final static int checkNum = 100;
+	private final static int checkNum = 500;
 	private final static double goodFraction = 0.3;
 	private final static int refreshIntervalSeconds = 60;
 
