@@ -58,7 +58,7 @@
 
 	<dependencies>
 
-		<!-- All dependencies changed here must also be changed in the build.xml 
+		<!-- All dependencies changed here must also be changed in the build.xml
 			file to match. -->
 
 		<dependency>
@@ -111,6 +111,9 @@
 				<configuration>
 					<source>1.8</source>
 					<target>1.8</target>
+					<compilerArgs>
+					   <arg>-XDignore.symbol.file</arg>
+					</compilerArgs>
 				</configuration>
 			</plugin>
 

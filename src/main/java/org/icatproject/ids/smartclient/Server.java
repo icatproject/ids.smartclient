@@ -249,6 +249,8 @@ public class Server {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
 				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
+				    Headers headers = httpExchange.getResponseHeaders();
+				    headers.add("Allow", "POST,OPTIONS");
 					corsify(httpExchange, 200, 0);
 					httpExchange.close();
 				} else if (!httpExchange.getRequestMethod().equals("POST")) {
@@ -442,6 +444,8 @@ public class Server {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
 				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
+				    Headers headers = httpExchange.getResponseHeaders();
+                    headers.add("Allow", "POST,OPTIONS");
 					corsify(httpExchange, 200, 0);
 					httpExchange.close();
 				} else if (!httpExchange.getRequestMethod().equals("POST")) {
@@ -503,6 +507,8 @@ public class Server {
 		httpServer.createContext("/logout", new HttpHandler() {
 			public void handle(HttpExchange httpExchange) throws IOException {
 				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
+				    Headers headers = httpExchange.getResponseHeaders();
+                    headers.add("Allow", "POST,OPTIONS");
 					corsify(httpExchange, 200, 0);
 					httpExchange.close();
 				} else if (!httpExchange.getRequestMethod().equals("POST")) {
@@ -875,6 +881,7 @@ public class Server {
 
 	private static void corsify(HttpExchange httpExchange, int sc, int length) throws IOException {
 		Headers headers = httpExchange.getResponseHeaders();
+		headers.add("Access-Control-Allow-Headers", "origin, content-type, accept, authorization");
 		headers.add("Access-Control-Allow-Origin", "*");
 		headers.add("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT");
 		httpExchange.sendResponseHeaders(sc, length);
