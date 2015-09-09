@@ -177,7 +177,7 @@ public class Server {
 
 		if (!Files.exists(store)) {
 			try {
-				CertAndKeyGen keyGen = new CertAndKeyGen("RSA", "SHA1WithRSA", null);
+				CertAndKeyGen keyGen = new CertAndKeyGen("RSA", "SHA256WithRSA", null);
 				keyGen.generate(1024);
 				PrivateKey key = keyGen.getPrivateKey();
 
@@ -249,8 +249,8 @@ public class Server {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
 				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
-				    Headers headers = httpExchange.getResponseHeaders();
-				    headers.add("Allow", "POST,OPTIONS");
+					Headers headers = httpExchange.getResponseHeaders();
+					headers.add("Allow", "POST,OPTIONS");
 					corsify(httpExchange, 200, 0);
 					httpExchange.close();
 				} else if (!httpExchange.getRequestMethod().equals("POST")) {
@@ -444,8 +444,8 @@ public class Server {
 
 			public void handle(HttpExchange httpExchange) throws IOException {
 				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
-				    Headers headers = httpExchange.getResponseHeaders();
-                    headers.add("Allow", "POST,OPTIONS");
+					Headers headers = httpExchange.getResponseHeaders();
+					headers.add("Allow", "POST,OPTIONS");
 					corsify(httpExchange, 200, 0);
 					httpExchange.close();
 				} else if (!httpExchange.getRequestMethod().equals("POST")) {
@@ -507,8 +507,8 @@ public class Server {
 		httpServer.createContext("/logout", new HttpHandler() {
 			public void handle(HttpExchange httpExchange) throws IOException {
 				if (httpExchange.getRequestMethod().equals("OPTIONS")) {
-				    Headers headers = httpExchange.getResponseHeaders();
-                    headers.add("Allow", "POST,OPTIONS");
+					Headers headers = httpExchange.getResponseHeaders();
+					headers.add("Allow", "POST,OPTIONS");
 					corsify(httpExchange, 200, 0);
 					httpExchange.close();
 				} else if (!httpExchange.getRequestMethod().equals("POST")) {
