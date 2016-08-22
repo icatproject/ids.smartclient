@@ -14,6 +14,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -26,21 +27,28 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+
 import java.security.KeyManagementException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -63,6 +71,12 @@ import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.icatproject.icat.client.ICAT;
 import org.icatproject.icat.client.IcatException;
 import org.icatproject.icat.client.IcatException.IcatExceptionType;
@@ -79,9 +93,6 @@ import org.icatproject.ids.client.NotFoundException;
 import org.icatproject.ids.client.NotImplementedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import sun.security.tools.keytool.CertAndKeyGen;
-import sun.security.x509.X500Name;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -110,8 +121,8 @@ public class Server {
 			try {
 				idsClient.restore(sessionId, data);
 				logger.debug("Restore request was succesful");
-			} catch (NotImplementedException | BadRequestException | InsufficientPrivilegesException
-					| InternalException | NotFoundException e) {
+			} catch (NotImplementedException | BadRequestException | InsufficientPrivilegesException | InternalException
+					| NotFoundException e) {
 				logger.warn("Restore request failed " + e.getClass().getSimpleName() + " " + e.getMessage());
 			}
 			return null;
@@ -132,8 +143,8 @@ public class Server {
 
 		private String idsUrl;
 
-		public PidStatus(String idsUrl, String pid) throws InternalException, BadRequestException, NotFoundException,
-				NotImplementedException, IOException {
+		public PidStatus(String idsUrl, String pid)
+				throws InternalException, BadRequestException, NotFoundException, NotImplementedException, IOException {
 			idsClient = new IdsClient(new URL(idsUrl));
 			this.idsUrl = idsUrl;
 
@@ -177,20 +188,32 @@ public class Server {
 
 		if (!Files.exists(store)) {
 			try {
-				CertAndKeyGen keyGen = new CertAndKeyGen("RSA", "SHA256WithRSA", null);
-				keyGen.generate(1024);
-				PrivateKey key = keyGen.getPrivateKey();
+				X500Name issuerName = new X500Name("CN=LOCALHOST");
+				X500Name subjectName = issuerName;
+				BigInteger serial = BigInteger.valueOf(new Random().nextInt());
+				KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+				generator.initialize(2048);
+				KeyPair keyPair = generator.genKeyPair();
+				PublicKey publicKey = keyPair.getPublic();
+				PrivateKey privateKey = keyPair.getPrivate();
+				long now = System.currentTimeMillis();
 
-				// Generate self signed certificate
-				X509Certificate[] chain = new X509Certificate[1];
-				chain[0] = keyGen.getSelfCertificate(new X500Name("CN=LOCALHOST"), (long) 365 * 24 * 3600);
+				SubjectPublicKeyInfo subPubKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
 
-				logger.debug("Certificate : " + chain[0].toString());
+				X509v3CertificateBuilder builder = new X509v3CertificateBuilder(issuerName, serial, new Date(now),
+						new Date(now + 86400000L * 365 * 100), subjectName, subPubKeyInfo);
+
+				ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(privateKey);
+
+				X509Certificate cert = new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+
+				logger.debug("Certificate : " + cert.toString());
+				Certificate[] certs = { cert };
 
 				KeyStore keyStore = KeyStore.getInstance("jks");
 				keyStore.load(null, null);
 
-				keyStore.setKeyEntry(alias, key, password, chain);
+				keyStore.setKeyEntry(alias, privateKey, password, certs);
 				keyStore.store(new FileOutputStream(store.toString()), password);
 
 			} catch (Exception e) {
@@ -257,7 +280,8 @@ public class Server {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
 					byte[] jsonBytes;
-					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
+					try (BufferedReader in = new BufferedReader(
+							new InputStreamReader(httpExchange.getRequestBody()));) {
 						String line = in.readLine();
 						int idx = line.indexOf("=");
 						jsonBytes = URLDecoder.decode(line.substring(idx + 1), "UTF-8").getBytes("UTF-8");
@@ -453,7 +477,8 @@ public class Server {
 				} else {
 					logger.debug("Login request received");
 					byte[] jsonBytes;
-					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
+					try (BufferedReader in = new BufferedReader(
+							new InputStreamReader(httpExchange.getRequestBody()));) {
 						String line = in.readLine();
 						int idx = line.indexOf("=");
 						jsonBytes = URLDecoder.decode(line.substring(idx + 1), "UTF-8").getBytes("UTF-8");
@@ -480,7 +505,8 @@ public class Server {
 								Session session = icatClient.getSession(sessionId);
 								session.refresh();
 							}
-						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
+						} catch (InternalException | NotImplementedException | BadRequestException
+								| URISyntaxException e) {
 							report(httpExchange, 500, "Possible internal error", e.getClass() + " " + e.getMessage());
 							return;
 						} catch (IcatException e) {
@@ -515,7 +541,8 @@ public class Server {
 					report(httpExchange, 404, "BadRequestException", "POST expected");
 				} else {
 					byte[] jsonBytes;
-					try (BufferedReader in = new BufferedReader(new InputStreamReader(httpExchange.getRequestBody()));) {
+					try (BufferedReader in = new BufferedReader(
+							new InputStreamReader(httpExchange.getRequestBody()));) {
 						String line = in.readLine();
 						int idx = line.indexOf("=");
 						jsonBytes = URLDecoder.decode(line.substring(idx + 1), "UTF-8").getBytes("UTF-8");
@@ -555,8 +582,8 @@ public class Server {
 		singleThreadPool = Executors.newSingleThreadExecutor();
 
 		try {
-			FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(PosixFilePermissions
-					.fromString("rwx------"));
+			FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions
+					.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
 			Files.createDirectories(dot, attr);
 		} catch (UnsupportedOperationException e) {
 			Files.createDirectories(dot);
@@ -602,9 +629,10 @@ public class Server {
 							ICAT icatClient = new ICAT(icatUrl);
 							Session session = icatClient.getSession(sessionId);
 							session.refresh();
-						} catch (InternalException | NotImplementedException | BadRequestException | URISyntaxException e) {
-							logger.warn("RefreshTask possible internal error for " + file + " " + " for Icat "
-									+ icatUrl + " " + e.getMessage());
+						} catch (InternalException | NotImplementedException | BadRequestException
+								| URISyntaxException e) {
+							logger.warn("RefreshTask possible internal error for " + file + " " + " for Icat " + icatUrl
+									+ " " + e.getMessage());
 						} catch (IcatException e) {
 							logger.debug("ICAT reports " + e.getClass() + " " + e.getMessage());
 							Files.delete(file.toPath());
@@ -652,7 +680,8 @@ public class Server {
 							}
 
 							Set<Long> ready = new HashSet<>();
-							try (JsonReader reader = Json.createReader(new StringReader(session.search(sb.toString())))) {
+							try (JsonReader reader = Json
+									.createReader(new StringReader(session.search(sb.toString())))) {
 								for (JsonValue v : reader.readArray()) {
 									JsonObject obj = ((JsonObject) v).getJsonObject("Datafile");
 									long id = obj.getJsonNumber("id").longValueExact();
@@ -812,7 +841,8 @@ public class Server {
 			Status status = idsClient.getStatus(sessionId, data);
 
 			if (status == Status.ONLINE) {
-				logger.debug("File " + dfId + " location " + location + " size " + fileSize + " bytes will be obtained");
+				logger.debug(
+						"File " + dfId + " location " + location + " size " + fileSize + " bytes will be obtained");
 				Path temp = Files.createTempFile(target.getParent(), null, null);
 
 				try (InputStream in = idsClient.getData(sessionId, data, Flag.NONE, 0)) {
@@ -938,7 +968,8 @@ public class Server {
 
 	private static String getSessionId(String idsUrl) throws IOException {
 		String filename = getServerFileName(idsUrl);
-		try (BufferedReader br = new BufferedReader(new FileReader(dot.resolve("servers").resolve(filename).toFile()));) {
+		try (BufferedReader br = new BufferedReader(
+				new FileReader(dot.resolve("servers").resolve(filename).toFile()));) {
 			return br.readLine();
 		}
 	}
