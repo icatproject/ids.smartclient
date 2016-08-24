@@ -39,8 +39,8 @@ public class Cli {
 		try {
 
 			try {
-				URI uri = new URIBuilder("https://localhost:8888").setPath("/ping").build();
-				try (CloseableHttpClient httpclient = getHttpsClient()) {
+				URI uri = new URIBuilder("http://localhost:8888").setPath("/ping").build();
+				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 					HttpGet httpGet = new HttpGet(uri);
 					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 						Cli.expectNothing(response);
@@ -89,19 +89,7 @@ public class Cli {
 		}
 	}
 
-	static CloseableHttpClient getHttpsClient() throws KeyManagementException, KeyStoreException,
-			NoSuchAlgorithmException, CertificateException, IOException {
-		Path home = Paths.get(System.getProperty("user.home"));
-		Path store = home.resolve(".smartclient").resolve("local.jks");
-		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-		try (FileInputStream instream = new FileInputStream(store.toFile())) {
-			trustStore.load(instream, "password".toCharArray());
-		}
-		SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(trustStore).build();
-		SSLConnectionSocketFactory factory = new SSLConnectionSocketFactory(sslcontext,
-				SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
-		return HttpClients.custom().setSSLSocketFactory(factory).build();
-	}
+
 
 	private static void printHelp() {
 		System.out.println("First parameter must be one of help, login, logout, get or ready");

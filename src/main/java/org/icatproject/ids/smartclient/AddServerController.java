@@ -27,6 +27,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 
 public class AddServerController {
@@ -65,13 +66,13 @@ public class AddServerController {
 
 		URI uri;
 		try {
-			uri = new URIBuilder("https://localhost:8888").setPath("/login").build();
+			uri = new URIBuilder("http://localhost:8888").setPath("/login").build();
 		} catch (URISyntaxException e) {
 			setStatus(e.getMessage());
 			return;
 		}
 
-		try (CloseableHttpClient httpclient = GUI.getHttpsClient()) {
+		try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 			HttpEntity entity = new UrlEncodedFormEntity(formparams);
 
 			HttpPost httpPost = new HttpPost(uri);

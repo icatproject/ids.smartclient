@@ -48,6 +48,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
@@ -143,12 +144,12 @@ public class GUIController {
 		gen.writeStartObject().write("idsUrl", idsUrl).writeEnd().close();
 
 		try {
-			URI uri = new URIBuilder("https://localhost:8888").setPath("/logout").build();
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/logout").build();
 
 			List<NameValuePair> formparams = new ArrayList<>();
 			formparams.add(new BasicNameValuePair("json", baos.toString()));
 
-			try (CloseableHttpClient httpclient = GUI.getHttpsClient()) {
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 				HttpEntity entity = new UrlEncodedFormEntity(formparams);
 				HttpPost httpPost = new HttpPost(uri);
 				httpPost.setEntity(entity);
@@ -186,12 +187,12 @@ public class GUIController {
 			gen.write(id).writeEnd().writeEnd().close();
 			System.out.println(baos.toString());
 
-			URI uri = new URIBuilder("https://localhost:8888").setPath("/getData").build();
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/getData").build();
 
 			List<NameValuePair> formparams = new ArrayList<>();
 			formparams.add(new BasicNameValuePair("json", baos.toString()));
 
-			try (CloseableHttpClient httpclient = GUI.getHttpsClient()) {
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 				HttpEntity entity = new UrlEncodedFormEntity(formparams);
 				HttpPost httpPost = new HttpPost(uri);
 				httpPost.setEntity(entity);
@@ -210,8 +211,8 @@ public class GUIController {
 		try {
 
 			try {
-				URI uri = new URIBuilder("https://localhost:8888").setPath("/ping").build();
-				try (CloseableHttpClient httpclient = GUI.getHttpsClient()) {
+				URI uri = new URIBuilder("http://localhost:8888").setPath("/ping").build();
+				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 					HttpGet httpGet = new HttpGet(uri);
 					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 						GUI.expectNothing(response);
@@ -248,8 +249,8 @@ public class GUIController {
 				}
 			}
 
-			URI uri = new URIBuilder("https://localhost:8888").setPath("/status").build();
-			try (CloseableHttpClient httpclient = GUI.getHttpsClient()) {
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/status").build();
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 				HttpGet httpGet = new HttpGet(uri);
 				try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 					GUI.checkStatus(response);
@@ -276,8 +277,8 @@ public class GUIController {
 									}
 								});
 								String idsUrl = server.getString("idsUrl");
-								RadioButton rb = new RadioButton(idsUrl + " ("
-										+ server.getString("user", "Not logged in") + ")");
+								RadioButton rb = new RadioButton(
+										idsUrl + " (" + server.getString("user", "Not logged in") + ")");
 								rb.setToggleGroup(group);
 								rb.setUserData(idsUrl);
 								table.getChildren().add(rb);

@@ -18,6 +18,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 public class Status {
@@ -36,8 +37,8 @@ public class Status {
 			parser.printHelpOn(System.out);
 		} else {
 
-			URI uri = new URIBuilder("https://localhost:8888").setPath("/status").build();
-			try (CloseableHttpClient httpclient = Cli.getHttpsClient()) {
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/status").build();
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 				HttpGet httpGet = new HttpGet(uri);
 				try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 					Cli.checkStatus(response);

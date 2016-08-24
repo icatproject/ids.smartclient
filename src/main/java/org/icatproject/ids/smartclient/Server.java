@@ -4,9 +4,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,7 +12,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
-import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -27,28 +24,13 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
-
-import java.security.KeyManagementException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -65,18 +47,7 @@ import javax.json.JsonReader;
 import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.stream.JsonGenerator;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
-import javax.net.ssl.TrustManagerFactory;
 
-import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.icatproject.icat.client.ICAT;
 import org.icatproject.icat.client.IcatException;
 import org.icatproject.icat.client.IcatException.IcatExceptionType;
@@ -97,9 +68,7 @@ import org.slf4j.LoggerFactory;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpsConfigurator;
-import com.sun.net.httpserver.HttpsParameters;
-import com.sun.net.httpserver.HttpsServer;
+import com.sun.net.httpserver.HttpServer;
 
 @SuppressWarnings("restriction")
 // Keeps eclipse happy
@@ -181,90 +150,9 @@ public class Server {
 		Path home = Paths.get(System.getProperty("user.home"));
 		dot = home.resolve(".smartclient");
 
-		Path store = dot.resolve("local.jks");
-
-		String alias = "localhost";
-		char[] password = "password".toCharArray();
-
-		if (!Files.exists(store)) {
-			try {
-				X500Name issuerName = new X500Name("CN=LOCALHOST");
-				X500Name subjectName = issuerName;
-				BigInteger serial = BigInteger.valueOf(new Random().nextInt());
-				KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-				generator.initialize(2048);
-				KeyPair keyPair = generator.genKeyPair();
-				PublicKey publicKey = keyPair.getPublic();
-				PrivateKey privateKey = keyPair.getPrivate();
-				long now = System.currentTimeMillis();
-
-				SubjectPublicKeyInfo subPubKeyInfo = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
-
-				X509v3CertificateBuilder builder = new X509v3CertificateBuilder(issuerName, serial, new Date(now),
-						new Date(now + 86400000L * 365 * 100), subjectName, subPubKeyInfo);
-
-				ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(privateKey);
-
-				X509Certificate cert = new JcaX509CertificateConverter().getCertificate(builder.build(signer));
-
-				logger.debug("Certificate : " + cert.toString());
-				Certificate[] certs = { cert };
-
-				KeyStore keyStore = KeyStore.getInstance("jks");
-				keyStore.load(null, null);
-
-				keyStore.setKeyEntry(alias, privateKey, password, certs);
-				keyStore.store(new FileOutputStream(store.toString()), password);
-
-			} catch (Exception e) {
-				logger.error("Failed to start " + e.getClass() + e.getMessage());
-				return;
-			}
-		}
-
 		int port = 8888;
 
-		HttpsServer httpServer = HttpsServer.create(new InetSocketAddress(port), 0);
-		SSLContext sslContext;
-		try {
-			sslContext = SSLContext.getInstance("TLS");
-			KeyStore ks = KeyStore.getInstance("JKS");
-			ks.load(new FileInputStream(store.toString()), password);
-			// setup the key manager factory
-			KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-			kmf.init(ks, password);
-
-			// setup the trust manager factory
-			TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
-			tmf.init(ks);
-
-			sslContext.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
-
-		} catch (NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException
-				| KeyManagementException e) {
-			logger.error("Failed to start " + e.getClass() + e.getMessage());
-			return;
-		}
-
-		httpServer.setHttpsConfigurator(new HttpsConfigurator(sslContext) {
-			public void configure(HttpsParameters params) {
-				try {
-					SSLContext c = SSLContext.getDefault();
-					SSLEngine engine = c.createSSLEngine();
-					params.setNeedClientAuth(false);
-					params.setCipherSuites(engine.getEnabledCipherSuites());
-					params.setProtocols(engine.getEnabledProtocols());
-
-					// get the default parameters
-					SSLParameters sslparams = c.getDefaultSSLParameters();
-
-					params.setSSLParameters(sslparams);
-				} catch (NoSuchAlgorithmException e) {
-					logger.error("Failed to start " + e.getClass() + e.getMessage());
-					return;
-				}
-			}
-		});
+		HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
 
 		httpServer.setExecutor(Executors.newCachedThreadPool());
 

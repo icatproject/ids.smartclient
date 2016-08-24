@@ -26,6 +26,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 
 public class Logout {
@@ -55,12 +56,12 @@ public class Logout {
 			gen.writeStartObject().write("idsUrl", idsUrl).writeEnd().close();
 			System.out.println(baos.toString());
 
-			URI uri = new URIBuilder("https://localhost:8888").setPath("/logout").build();
+			URI uri = new URIBuilder("http://localhost:8888").setPath("/logout").build();
 
 			List<NameValuePair> formparams = new ArrayList<>();
 			formparams.add(new BasicNameValuePair("json", baos.toString()));
 
-			try (CloseableHttpClient httpclient = Cli.getHttpsClient()) {
+			try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 				HttpEntity entity = new UrlEncodedFormEntity(formparams);
 				HttpPost httpPost = new HttpPost(uri);
 				httpPost.setEntity(entity);

@@ -100,18 +100,6 @@ public class GUI extends Application {
 		throw new IOException(msg);
 	}
 
-	static CloseableHttpClient getHttpsClient() throws KeyManagementException, KeyStoreException,
-			NoSuchAlgorithmException, CertificateException, IOException {
-		Path home = Paths.get(System.getProperty("user.home"));
-		Path store = home.resolve(".smartclient").resolve("local.jks");
-		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-		try (FileInputStream instream = new FileInputStream(store.toFile())) {
-			trustStore.load(instream, "password".toCharArray());
-		}
-		SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(trustStore).build();
-		SSLConnectionSocketFactory factory = new SSLConnectionSocketFactory(sslcontext,
-				SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
-		return HttpClients.custom().setSSLSocketFactory(factory).build();
-	}
+
 
 }

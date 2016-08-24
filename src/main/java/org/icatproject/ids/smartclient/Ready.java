@@ -23,6 +23,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 public class Ready {
@@ -63,9 +64,9 @@ public class Ready {
 				}
 				gen.writeEnd().close();
 
-				URI uri = new URIBuilder("https://localhost:8888").setPath("/isReady")
+				URI uri = new URIBuilder("http://localhost:8888").setPath("/isReady")
 						.addParameter("json", baos.toString()).build();
-				try (CloseableHttpClient httpclient = Cli.getHttpsClient()) {
+				try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
 					HttpGet httpGet = new HttpGet(uri);
 					try (CloseableHttpResponse response = httpclient.execute(httpGet)) {
 						Cli.checkStatus(response);

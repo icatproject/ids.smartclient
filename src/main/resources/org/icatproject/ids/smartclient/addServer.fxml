@@ -25,7 +25,7 @@
 				<TextField fx:id="idsUrl" GridPane.columnIndex="1"
 					GridPane.rowIndex="0">
 					<tooltip>
-						<Tooltip text="URL must include the scheme (e.g. https)" />
+						<Tooltip text="URL must include the scheme (e.g. http)" />
 					</tooltip>
 				</TextField>
 

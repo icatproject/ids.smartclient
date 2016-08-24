@@ -80,13 +80,6 @@
 				<filename name="javax.json-1.0.4.jar" />
 			</fileset>
 
-			<fileset dir="${user.home}/.m2/repository/org/bouncycastle/bcpkix-jdk15on/1.55">
-				<filename name="bcpkix-jdk15on-1.55.jar" />
-			</fileset>
-
-			<fileset dir="${user.home}/.m2/repository/org/bouncycastle/bcprov-jdk15on/1.55">
-				<filename name="bcprov-jdk15on-1.55.jar" />
-			</fileset>
 		</copy>
 
 	</target>
@@ -106,7 +99,6 @@
 					<include name="**/*.jar" />
 				</fileset>
 			</classpath>
-			<compilerarg value="-XDignore.symbol.file" />
 		</javac>
 
 		<copy todir="build/classes">
