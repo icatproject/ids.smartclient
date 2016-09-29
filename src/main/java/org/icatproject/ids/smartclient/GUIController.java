@@ -3,6 +3,7 @@ package org.icatproject.ids.smartclient;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.Paths;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
@@ -69,6 +70,8 @@ public class GUIController {
 
 	private boolean windows;
 
+	private boolean mac;
+
 	@FXML
 	private Label title;
 
@@ -109,6 +112,7 @@ public class GUIController {
 	@FXML
 	private void initialize() {
 		windows = System.getProperty("os.name").startsWith("Windows");
+		mac = System.getProperty("os.name").startsWith("Mac");
 		update();
 		Timeline timeline = new Timeline(new KeyFrame(Duration.seconds(10), ae -> update()));
 		timeline.setCycleCount(Animation.INDEFINITE);
@@ -226,6 +230,9 @@ public class GUIController {
 				if (windows) {
 					String home = System.getProperty("user.home");
 					pb = new ProcessBuilder(home + "/AppData/Local/smartclient/server");
+				} else if(mac){
+					String currentDir = Paths.get("").toAbsolutePath().toString();
+					pb = new ProcessBuilder(currentDir + "/mac_server.sh");
 				} else {
 					pb = new ProcessBuilder("sh", "/opt/smartclient/app/server.sh");
 				}

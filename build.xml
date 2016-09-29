@@ -140,6 +140,7 @@
 				<fx:fileset dir="build/dist" includes="ids.smartclient.jar" />
 				<fx:fileset dir="build" includes="lib/*" />
 				<fx:fileset dir="src/main/scripts" includes="server.*" />
+				<fx:fileset dir="src/main/scripts" includes="mac_server.*" />
 				<fx:fileset dir="." includes="LICENSE.txt" type="license" />
 			</fx:resources>
 
