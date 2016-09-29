@@ -802,6 +802,7 @@ public class Server {
 		headers.add("Access-Control-Allow-Headers", "origin, content-type, accept, authorization");
 		headers.add("Access-Control-Allow-Origin", "*");
 		headers.add("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT");
+		headers.add("Content-Type", "application/json");
 		httpExchange.sendResponseHeaders(sc, length);
 	}
 
