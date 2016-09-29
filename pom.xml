@@ -17,7 +17,7 @@
 	<repositories>
 		<repository>
 			<id>ICAT Repo</id>
-			<url>http://www.icatproject.org/mvn/repo</url>
+			<url>https://repo.icatproject.org/mvn/</url>
 		</repository>
 	</repositories>
 
@@ -43,18 +43,6 @@
 		<name>The ICAT Collaboration</name>
 		<url>http://icatproject.org</url>
 	</organization>
-
-	<distributionManagement>
-		<downloadUrl>http://www.icatproject.org/mvn/repo</downloadUrl>
-		<site>
-			<id>website</id>
-			<url>scp://www.icatproject.org/var/www/html/mvn/site/ids/smartclient/${project.version}</url>
-		</site>
-		<repository>
-			<id>repo</id>
-			<url>scp://www.icatproject.org/var/www/html/mvn/repo</url>
-		</repository>
-	</distributionManagement>
 
 	<dependencies>
 
