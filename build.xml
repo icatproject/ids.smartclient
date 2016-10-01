@@ -44,10 +44,6 @@
 				<filename name="activation-1.1.jar" />
 			</fileset>
 
-			<fileset dir="${user.home}/.m2/repository/org/icatproject/icat.utils/4.7.0">
-				<filename name="icat.utils-4.7.0.jar" />
-			</fileset>
-
 			<fileset dir="${user.home}/.m2/repository/net/sf/jopt-simple/jopt-simple/4.9">
 				<filename name="jopt-simple-4.9.jar" />
 			</fileset>

@@ -46,7 +46,7 @@
 
 	<dependencies>
 
-		<!-- All dependencies changed here must also be changed in the build.xml 
+		<!-- All dependencies changed here must also be changed in the build.xml
 			file to match. -->
 
 		<dependency>
@@ -90,15 +90,6 @@
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.11</version>
-			<scope>test</scope>
-		</dependency>
-
-		<!-- This dependency only exists to ensure that it is dragged into ~/.m2/repository -->
-
-		<dependency>
-			<groupId>org.icatproject</groupId>
-			<artifactId>icat.utils</artifactId>
-			<version>4.7.0</version>
 			<scope>test</scope>
 		</dependency>
 
